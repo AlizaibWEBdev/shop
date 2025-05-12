@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modernsss Landingsss Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        newlify: {
+                            primary: '#3498db',
+                            dark: '#2980b9',
+                            text: '#2c3e50',
+                            light: '#7f8c8d',
+                            divider: '#ecf0f1',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #FFFFFF04;
+            font-family: 'Inter', sans-serif;
+        }
+        header{
+            backdrop-filter: blur(15px);
+        }
+       
+        h2 , header h1, header i{
+            color: rgb(30, 41, 59);
+        }
+        a{
+            color: rgb(0, 0, 0) !important;
+        }
+        #home a{
+            color: white !important;
+        }
+        p{
+            color: rgb(71, 85, 105) !important;
+        }
+        /* Sidebar styles */
+        .sidebar {
+            transition: transform 0.3s ease-in-out;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 50;
+            background: rgba(17, 24, 39, 0.95); /* Dark semi-transparent background */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        /* Hero image animation */
+        .hero-image {
+            transition: transform 0.3s ease, opacity 0.5s ease;
+        }
+
+        .hero-image:hover {
+            transform: scale(1.05);
+            opacity: 0.95;
+        }
+
+        /* CTA button hover effect */
+        .cta-button {
+            transition: transform 0.2s ease, background-color 0.3s ease;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Fade-in animation for sections */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+
+        /* Hide scrollbar for sidebar */
+        .sidebar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .sidebar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class=" text-white">
+    <!-- Header -->
+    <header class="fixed top-0 w-full  z-40 shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold ">Nexlify</h1>
+            <!-- Hamburger for mobile -->
+            <button id="menu-toggle" class="text-2xl md:hidden focus:outline-none">
+                <i class="fas fa-bars"></i>
+            </button>
+            <!-- Desktop navigation -->
+            <nav class="hidden md:flex space-x-6">
+                <a href="#home" class="text-lg hover:text-indigo-400 transition-colors flex items-center space-x-2">
+                  
+                    <span>Home</span>
+                </a>
+                <a href="#about" class="text-lg hover:text-indigo-400 transition-colors flex items-center space-x-2">
+                   
+                    <span>About</span>
+                </a>
+                <a href="./login.html" class="text-lg hover:text-indigo-400 transition-colors flex items-center space-x-2">
+                 
+                    <span>Login</span>
+                </a>
+                <a href="./singup.html" class="text-lg hover:text-indigo-400 transition-colors flex items-center space-x-2">
+                    
+                    <span>Signup</span>
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Sidebar (Mobile Only) -->
+    <nav id="sidebar" class="sidebar w-64 h-full pt-20 transform -translate-x-full md:hidden">
+        <ul class="space-y-4 px-6">
+            <li>
+                <a href="#home" class="flex items-center space-x-3 text-lg hover:text-indigo-400 transition-colors">
+                    <i class="fas fa-home"></i>
+                    <span>Home</span>
+                </a>
+            </li>
+            <li>
+                <a href="#about" class="flex items-center space-x-3 text-lg hover:text-indigo-400 transition-colors">
+                    <i class="fas fa-info-circle"></i>
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="#login" class="flex items-center space-x-3 text-lg hover:text-indigo-400 transition-colors">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Login</span>
+                </a>
+            </li>
+            <li>
+                <a href="#signup" class="flex items-center space-x-3 text-lg hover:text-indigo-400 transition-colors">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Signup</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+        <main class="  flex items-center justify-center">
+        
+            <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-10 text-center mt-2">
+                <h1 class="text-3xl font-bold text-newlify-text mb-1">Newlify</h1>
+                <p class="text-newlify-light mb-8 text-base">Empower Your Future with Newlify</p>
+                
+                <div class="h-px bg-newlify-divider my-6"></div>
+                
+                <form>
+                    <div class="mb-5 text-left">
+                        <label for="email" class="block font-semibold text-newlify-text mb-2">Email Address</label>
+                        <input type="email" id="email" name="email" placeholder="Enter your email" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-newlify-primary transition-colors">
+                    </div>
+                    
+                    <div class="mb-5 text-left">
+                        <label for="password" class="block font-semibold text-newlify-text mb-2">Password</label>
+                        <input type="password" id="password" name="password" placeholder="Enter your password" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-newlify-primary transition-colors">
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-newlify-primary text-white py-3.5 px-5 rounded-lg font-semibold text-base hover:bg-newlify-dark transition-colors">
+                        Log In
+                    </button>
+                    <a href="#" class="block text-center mt-4 text-newlify-primary text-sm">Forgot password?</a>
+                </form>
+                
+                <div class="mt-6 text-newlify-light text-sm">
+                    Don't have an account? <a href="#" class="text-newlify-primary font-semibold">Sign up</a>
+                </div>
+            </div>
+    </main>
+
+    <script>
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+
+        // Toggle sidebar
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('-translate-x-full');
+        });
+
+        // Close sidebar on link click for mobile
+        const navLinks = document.querySelectorAll('.sidebar a');
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                sidebar.classList.add('-translate-x-full');
+            });
+        });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!sidebar.contains(e.target) && !menuToggle.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.add('-translate-x-full');
+            }
+        });
+
+        // Add scroll animation
+        window.addEventListener('scroll', () => {
+            const elements = document.querySelectorAll('.animate-fade-in');
+            elements.forEach(el => {
+                const rect = el.getBoundingClientRect();
+                if (rect.top <= window.innerHeight * 0.8) {
+                    el.classList.add('animate-fade-in');
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

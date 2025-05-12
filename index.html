@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Landing Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        #sidebar{
+            background: #c9c9c999;
+        }
+        body {
+            background-color: #FFFFFF04;
+            font-family: 'Inter', sans-serif;
+        }
+        header{
+            backdrop-filter: blur(15px);
+        }
+       
+        h2 , header h1, header i{
+            color: rgb(30, 41, 59);
+        }
+        a{
+            color: rgb(0, 0, 0) !important;
+        }
+        #home a{
+            color: white !important;
+        }
+        p{
+            color: rgb(71, 85, 105) !important;
+        }
+        /* Sidebar styles */
+        .sidebar {
+            transition: transform 0.3s ease-in-out;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 50;
+            background: rgba(17, 24, 39, 0.95); /* Dark semi-transparent background */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        /* Hero image animation */
+        .hero-image {
+            transition: transform 0.3s ease, opacity 0.5s ease;
+        }
+
+        .hero-image:hover {
+            transform: scale(1.05);
+            opacity: 0.95;
+        }
+
+        /* CTA button hover effect */
+        .cta-button {
+            transition: transform 0.2s ease, background-color 0.3s ease;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Fade-in animation for sections */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+
+        /* Hide scrollbar for sidebar */
+        .sidebar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .sidebar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class=" text-white">
+    <!-- Header -->
+    <header class="fixed top-0 w-full  z-40 shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold ">Nexlify</h1>
+            <!-- Hamburger for mobile -->
+            <button id="menu-toggle" class="text-2xl md:hidden focus:outline-none">
+                <i class="fas fa-bars"></i>
+            </button>
+            <!-- Desktop navigation -->
+            <nav class="hidden md:flex space-x-6">
+                <a href="./shop/index.html" class="text-lg hover:text-indigo-400 transition-colors flex items-center space-x-2">
+                  
+                    <span>Shop Now</span>
+                </a>
+                <a href="#about" class="text-lg hover:text-indigo-400 transition-colors flex items-center space-x-2">
+                   
+                    <span>About</span>
+                </a>
+                <a href="./login.html" class="text-lg hover:text-indigo-400 transition-colors flex items-center space-x-2">
+                 
+                    <span>Login</span>
+                </a>
+                <a href="./singup.html" class="text-lg hover:text-indigo-400 transition-colors flex items-center space-x-2">
+                    
+                    <span>Signup</span>
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Sidebar (Mobile Only) -->
+    <nav id="sidebar" class="sidebar w-64 h-full pt-20 transform -translate-x-full md:hidden">
+        <ul class="space-y-4 px-6">
+            <li>
+                <a href="#home" class="flex items-center space-x-3 text-lg hover:text-indigo-400 transition-colors">
+                    <i class="fas fa-home"></i>
+                    <span>Home</span>
+                </a>
+            </li>
+            <li>
+                <a href="#about" class="flex items-center space-x-3 text-lg hover:text-indigo-400 transition-colors">
+                    <i class="fas fa-info-circle"></i>
+                    <span>About</span>
+                </a>
+            </li>
+            <li>
+                <a href="#login" class="flex items-center space-x-3 text-lg hover:text-indigo-400 transition-colors">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Login</span>
+                </a>
+            </li>
+            <li>
+                <a href="#signup" class="flex items-center space-x-3 text-lg hover:text-indigo-400 transition-colors">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Signup</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-16">
+        <!-- Hero Section -->
+        <section id="home" class="min-h-screen flex items-center">
+            <div class="container mx-auto px-4 flex flex-col md:flex-row items-center animate-fade-in">
+                <div class="md:w-1/2 mb-8 md:mb-0">
+                    <h2 class="text-4xl md:text-5xl font-extrabold leading-tight mb-6">
+                        Empower Your Future with Nexlify
+                    </h2>
+                    <p class="text-lg  mb-8">
+                        Join a platform designed to elevate your experience with cutting-edge technology and seamless design.
+                    </p>
+                    <a href="./singup.html" class="cta-button inline-block bg-indigo-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-indigo-700">
+                        Start Now
+                    </a>
+                </div>
+                <div class="md:w-1/2">
+                    <img src="./images/E-commerce Landing Page - Google Chrome 4_30_2025 2_09_48 PM.png" alt="Hero Image" class="hero-image w-full rounded-2xl shadow-2xl">
+                </div>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section id="about" class="py-20">
+            <div class="container mx-auto px-4 animate-fade-in">
+                <h2 class="text-3xl font-bold text-center mb-10">About Us</h2>
+                <div class="max-w-3xl mx-auto text-center">
+                    <p class="text-gray-300 text-lg leading-relaxed">
+                        At Nexlify, we are passionate about creating innovative solutions that empower individuals and businesses. Our team is dedicated to delivering exceptional experiences through modern technology and user-centric design. Join us on a journey to redefine what's possible.
+                    </p>
+                    <a href="./singup.html" class="cta-button mt-2  inline-block bg-indigo-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-indigo-700">
+                        <span class="text-white">Get Sarted </span>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section class="py-16 px-4 bg-gradient-to-r from-blue-50 to-gray-50">
+            <div class="container mx-auto max-w-6xl">
+                <div class="flex flex-col lg:flex-row items-center gap-12">
+                    <!-- Assistant Image/Content -->
+                    <div class="lg:w-1/2 flex justify-center">
+                        <div class="relative">
+                            <img src="images/1745595407550.jpg" alt="Newlify Shopping Assistant" class="rounded-2xl shadow-xl w-full max-w-md">
+                            <div class="absolute -bottom-5 -right-5 bg-white px-4 py-2 rounded-full shadow-md">
+                                <span class="flex items-center">
+                                    <span class="relative flex h-3 w-3 mr-2">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                                    </span>
+                                    <span class="text-sm font-medium text-newlify-text text-gray-900">Online Now</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Assistant Description -->
+                    <div class="lg:w-1/2">
+                        <h2 class="text-3xl font-bold text-newlify-text mb-4">24/7 Shopping Assistant</h2>
+                        <p class="text-lg text-newlify-light mb-6">
+                            Meet Alex, your personal shopping assistant! Available round-the-clock to help you find the perfect products, answer questions, and provide personalized recommendations.
+                        </p>
+                        <div class="space-y-4 mb-8">
+                            <div class="flex items-start">
+                                <svg class="h-6 w-6 text-newlify-primary mr-3 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <p>Instant answers to product questions</p>
+                            </div>
+                            <div class="flex items-start">
+                                <svg class="h-6 w-6 text-newlify-primary mr-3 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <p>Personalized recommendations just for you</p>
+                            </div>
+                            <div class="flex items-start">
+                                <svg class="h-6 w-6 text-newlify-primary mr-3 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <p>Available anytime, day or night</p>
+                            </div>
+                        </div>
+                        <a href="./singup.html" class="cta-button inline-block bg-indigo-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-indigo-700">
+                           <span class="text-white">Chat Now</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+
+    <script>
+        let token = localStorage.getItem("token");
+        if (token) {
+            window.location.href = "./shop";
+        }
+
+    </script>
+
+    <script>
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+
+        // Toggle sidebar
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('-translate-x-full');
+        });
+
+        // Close sidebar on link click for mobile
+        const navLinks = document.querySelectorAll('.sidebar a');
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                sidebar.classList.add('-translate-x-full');
+            });
+        });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!sidebar.contains(e.target) && !menuToggle.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.add('-translate-x-full');
+            }
+        });
+
+        // Add scroll animation
+        window.addEventListener('scroll', () => {
+            const elements = document.querySelectorAll('.animate-fade-in');
+            elements.forEach(el => {
+                const rect = el.getBoundingClientRect();
+                if (rect.top <= window.innerHeight * 0.8) {
+                    el.classList.add('animate-fade-in');
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

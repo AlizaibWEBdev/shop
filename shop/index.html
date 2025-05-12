@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-commerce Landing Page</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    newlify: {
+                        primary: '#3498db',
+                        dark: '#2980b9',
+                        text: '#2c3e50',
+                        light: '#7f8c8d',
+                        divider: '#ecf0f1',
+                    }
+                }
+            }
+        }
+    }
+</script>
+<style>
+    header {
+        backdrop-filter: blur(15px);
+    }
+
+
+    .product-recommendations {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .chatbot-product-card {
+        display: none;
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .chatbot-product-card.active {
+        display: block;
+    }
+
+    .nav-arrow {
+        position: absolute;
+        top: 50%;
+        height: 40px;
+        width: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: translateY(-50%);
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        padding: 10px;
+        cursor: pointer;
+        font-size: 20px;
+        border-radius: 50%;
+    }
+
+    .nav-arrow.left {
+        left: 10px;
+    }
+
+    .nav-arrow.right {
+        right: 10px;
+    }
+
+    .category-buttons-container {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        margin-bottom: 20px;
+        background: linear-gradient(180deg, #f9fafb75, #f1f5f96c);
+        padding: 10px 0;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .category-buttons {
+        display: flex;
+        gap: 12px;
+        transition: transform 0.3s ease-in-out;
+        white-space: nowrap;
+        padding: 0 20px;
+    }
+
+    .category-button {
+        padding: 10px 20px;
+        background-color: #ffffff;
+        color: #2c3e50;
+        border: 1px solid #e5e7eb;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+        text-transform: capitalize;
+    }
+
+    .category-button:hover {
+        background-color: #3498db;
+        color: #ffffff;
+        border-color: #3498db;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .category-nav-arrow {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        height: 36px;
+        width: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff;
+        color: #2c3e50;
+        cursor: pointer;
+        font-size: 18px;
+        border-radius: 50%;
+        border: 1px solid #e5e7eb;
+        z-index: 111;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .category-nav-arrow:hover {
+        background: #3498db;
+        color: #ffffff;
+        border-color: #3498db;
+    }
+
+    .category-nav-arrow.left {
+        left: 10px;
+    }
+
+    .category-nav-arrow.right {
+        right: 10px;
+    }
+</style>
+
+<body>
+    <header class="fixed top-0 w-full z-40 shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Nexlify</h1>
+            <div class="md:hidden">
+                <a href="../Cards.html">
+                    <span class="relative inline-block mr-6">
+                        <i class="fas fa-shopping-cart text-xl"></i>
+                        <span
+                            class="absolute -top-2 -right-2 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                            3
+                        </span>
+                    </span>
+                </a>
+                <a href="#" onclick="logout()" class="mr-2">
+                    <i class="fa fa-sign-out" aria-hidden="true"></i>
+                </a>
+            </div>
+            <nav class="hidden md:flex space-x-6">
+                <a href="#" onclick="logout()" class="mr-2">
+                    <i class="fa fa-sign-out" aria-hidden="true"></i>
+                </a>
+                <a href="../Cards.html"
+                    class="text-lg hover:text-indigo-400 transition-colors flex items-center space-x-2">
+                    <span class="relative inline-block">
+                        <i class="fas fa-shopping-cart text-xl"></i>
+                        <span id="cartItemsCount"
+                            class="absolute -top-2 -right-2 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                            3
+                        </span>
+                    </span>
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <nav id="sidebar" class="sidebar w-64 h-full pt-20 transform -translate-x-full md:hidden">
+        <ul class="space-y-4 px-6"></ul>
+    </nav>
+
+    <section class="products" id="products">
+        <h2>Our Products</h2>
+        <div class="category-buttons-container">
+            <div class="category-nav-arrow left" onclick="scrollCategories(-1)">
+                <i class="fas fa-chevron-left"></i>
+            </div>
+            <div class="category-buttons" id="categoryButtons"></div>
+            <div class="category-nav-arrow right" onclick="scrollCategories(1)">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        </div>
+        <div class="product-grid" id="productGrid"></div>
+    </section>
+
+    <div class="chatbot-icon msg" onclick="toggleChatbot()">
+        <img src="images.jpeg" alt="Chat Icon">
+    </div>
+    <div class="chatbot-popup" id="chatbotPopup">
+        <div class="chatbot-header" onclick="toggleChatbot()">ShopTrend Assistant</div>
+        <div class="chatbot-body"></div>
+        <div class="chatbot-footer">
+            <input type="text" class="chatbot-input" id="chatbotInput" placeholder="Type your message..."
+                onkeydown="sendMessage(event)">
+            <div class="send-icon" onclick="sendMessageClick()"></div>
+        </div>
+    </div>
+
+    <div class="overlay" id="popupOverlay"></div>
+    <div class="product-popup" id="productPopup">
+        <span class="popup-close" onclick="closePopup()">×</span>
+        <img class="popup-image" id="popupImage" src="" alt="">
+        <h2 class="popup-title" id="popupTitle"></h2>
+        <p class="popup-price" id="popupPrice"></p>
+        <p class="popup-insight" id="popupInsight"></p>
+    </div>
+    <script src="main.js"></script>
+
+</body>
+
+</html>
