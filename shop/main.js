@@ -20,6 +20,20 @@ const productFiles = [
     "./tshirts shirts for women.json"
 ];
 
+// Clear chat history and context if user ID changes
+function checkAndClearChatOnLogin() {
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    const previousUserId = localStorage.getItem('previousUserId');
+
+    if (currentUser && previousUserId && currentUser.id !== previousUserId) {
+        localStorage.removeItem('chatHistory');
+        localStorage.removeItem('queryContext');
+        localStorage.setItem('previousUserId', currentUser.id);
+    } else if (currentUser && !previousUserId) {
+        localStorage.setItem('previousUserId', currentUser.id);
+    }
+}
+
 function loadChatHistory() {
     const history = localStorage.getItem('chatHistory');
     return history ? JSON.parse(history) : [];
@@ -31,8 +45,6 @@ function saveChatHistory(entry) {
     if (history.length > MAX_CHAT_HISTORY) {
         history = history.slice(-MAX_CHAT_HISTORY);
     }
-    console.log(history);
-    
     localStorage.setItem('chatHistory', JSON.stringify(history));
 }
 
@@ -55,11 +67,9 @@ function saveQueryContext(context) {
 }
 
 async function addToCart(product) {
-    let quantity = 1; // Default quantity
+    let quantity = 1;
     const { id, title, price, imageUrl, user_id } = product;
 
-    console.log(id, title, price, imageUrl, user_id);
-    
     if (!id || !title || !price || !imageUrl || !user_id) {
         console.error("Missing required product fields");
         return;
@@ -149,7 +159,7 @@ async function fetchCartContents() {
 
         const data = await response.json();
         if (response.ok) {
-            return { success: true, items: data || [] }; // Cart page expects array directly
+            return { success: true, items: data || [] };
         } else {
             return { success: false, message: data.message || 'Failed to fetch cart contents' };
         }
@@ -277,7 +287,7 @@ function navigateProducts(container, direction) {
 
 function simulateThinking() {
     return new Promise(resolve => {
-        const delay = Math.random() * 1000 + 1000; // 1-2 seconds
+        const delay = Math.random() * 1000 + 1000;
         setTimeout(resolve, delay);
     });
 }
@@ -383,8 +393,12 @@ async function sendMessageCommon() {
             return;
         }
 
+        // Skip confirmation for clear "show me" requests
+        const showKeywords = ['show me', 'display', 'view', 'see'];
+        const isDirectShowRequest = showKeywords.some(keyword => message.toLowerCase().includes(keyword));
+
         // Handle confirmation responses
-        if (queryContext.awaitingConfirmation) {
+        if (queryContext.awaitingConfirmation && !isDirectShowRequest) {
             const affirmativeResponses = ['yes', 'sure', 'okay', 'yep', 'show', 'please', 'yha', 'yeah', 'ok', 'yup'];
             const messageLower = message.toLowerCase();
             if (affirmativeResponses.some(word => messageLower.includes(word))) {
@@ -494,6 +508,36 @@ async function sendMessageCommon() {
             return;
         }
 
+        // Check for delivery cost query
+        const deliveryKeywords = ['delivery cost', 'shipping cost', 'delivery fee', 'shipping fee'];
+        if (deliveryKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
+            typingIndicator.remove();
+            const responseText = `${JSON.parse(localStorage.getItem('user')).name}, delivery costs vary based on your location and order total. You can see the exact amount at checkout, or I can help you explore our products first!`;
+            addMessageToChat(responseText, 'bot-message');
+            saveChatHistory({
+                type: 'message',
+                sender: 'bot',
+                message: responseText,
+                timestamp: new Date().toISOString()
+            });
+            return;
+        }
+
+        // Check for listing categories
+        if (message.toLowerCase().includes('list') && message.toLowerCase().includes('categories')) {
+            typingIndicator.remove();
+            const categories = productFiles.map(file => file.replace('.json', '').replace('./', '').replace(/_/g, ' ')).join(', ');
+            const responseText = `${JSON.parse(localStorage.getItem('user')).name}, here are all the product categories we have: ${categories}. Which one would you like to explore?`;
+            addMessageToChat(responseText, 'bot-message');
+            saveChatHistory({
+                type: 'message',
+                sender: 'bot',
+                message: responseText,
+                timestamp: new Date().toISOString()
+            });
+            return;
+        }
+
         const fileAnalysisPrompt = `
             You are an assistant for an e-commerce website.
             Analyze the user's message and determine:
@@ -557,7 +601,24 @@ async function sendMessageCommon() {
         if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile !== "none") {
             queryContext.lastQuery = message;
             saveQueryContext(queryContext);
-            await handleProductQuery(message, fileAnalysis.relevantFile);
+            if (isDirectShowRequest) {
+                await simulateThinking();
+                const thinkingIndicator = addMessageToChat('Searching for the best options...', 'typing-indicator');
+                await displayPendingProducts(message, fileAnalysis.relevantFile);
+                thinkingIndicator.remove();
+            } else {
+                await handleProductQuery(message, fileAnalysis.relevantFile);
+            }
+        } else if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile === "none") {
+            // Handle unavailable categories like undergarments
+            const responseText = `${JSON.parse(localStorage.getItem('user')).name}, I’m sorry, but we don’t have that category in our collection. You can check out items like sunglasses, bags, or caps instead—would you like to see those?`;
+            addMessageToChat(responseText, 'bot-message');
+            saveChatHistory({
+                type: 'message',
+                sender: 'bot',
+                message: responseText,
+                timestamp: new Date().toISOString()
+            });
         } else {
             await handleGeneralQuery(message);
         }
@@ -890,7 +951,6 @@ async function updateCartItemCount() {
         }
       });
       const data = await response.json();
-      console.log(data);
       
       if (data.success == true) {
         cartItemsCount.textContent = data.count || 0;
@@ -1053,6 +1113,7 @@ async function renderMixedProducts(limit = 100) {
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
+    checkAndClearChatOnLogin();
     await Promise.all(productFiles.map(async file => {
         try {
             const response = await fetch(file);
@@ -1071,6 +1132,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('previousUserId');
     window.location.href = '../login.html';
 }
 
