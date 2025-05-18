@@ -1,7 +1,7 @@
 let allProductsCache = {};
 let queryContext = {};
 const API_KEY = "AIzaSyDHbhK8_EZRJ_Br6MsviB2Pu6BuE6KctVg";
-const MAX_CHAT_HISTORY = 10;
+const MAX_CHAT_HISTORY = 50;
 
 const productFiles = [
     "./beanies caps for men women.json",
@@ -31,6 +31,8 @@ function saveChatHistory(entry) {
     if (history.length > MAX_CHAT_HISTORY) {
         history = history.slice(-MAX_CHAT_HISTORY);
     }
+    console.log(history);
+    
     localStorage.setItem('chatHistory', JSON.stringify(history));
 }
 
@@ -53,9 +55,11 @@ function saveQueryContext(context) {
 }
 
 async function addToCart(product) {
-    let quantity = 1;
+    let quantity = 1; // Default quantity
     const { id, title, price, imageUrl, user_id } = product;
 
+    console.log(id, title, price, imageUrl, user_id);
+    
     if (!id || !title || !price || !imageUrl || !user_id) {
         console.error("Missing required product fields");
         return;
@@ -127,6 +131,34 @@ async function trackOrder(trackingId) {
     }
 }
 
+async function fetchCartContents() {
+    const userId = JSON.parse(localStorage.getItem('user'))?.id;
+    const token = localStorage.getItem('token');
+    if (!userId || !token) {
+        return { success: false, message: 'User not logged in' };
+    }
+
+    try {
+        const response = await fetch(`https://fitsedit.tooliso.com/cart?user_id=${userId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            return { success: true, items: data.items || [] };
+        } else {
+            return { success: false, message: data.message || 'Failed to fetch cart contents' };
+        }
+    } catch (error) {
+        console.error('Error fetching cart contents:', error);
+        return { success: false, message: 'Server error while fetching cart contents' };
+    }
+}
+
 function getChatContext() {
     const history = loadChatHistory();
     const context = loadQueryContext();
@@ -134,8 +166,11 @@ function getChatContext() {
         .filter(h => h.type === 'message')
         .map(h => `${h.sender}: ${h.message}`)
         .join('\n');
-    if (context.category || context.lastQuery) {
-        contextString += `\nCurrent product category: ${context.category || 'none'}\nLast query: ${context.lastQuery || 'none'}`;
+    if (context.lastQuery) {
+        contextString += `\nMost recent user query: ${context.lastQuery}`;
+    }
+    if (context.category) {
+        contextString += `\nCurrent product category (if still relevant): ${context.category || 'none'}`;
     }
     if (context.lastShownCategory) {
         contextString += `\nLast shown category: ${context.lastShownCategory}`;
@@ -158,8 +193,7 @@ function toggleChatbot() {
 function loadChatMessages() {
     const history = loadChatHistory();
     const chatbotBody = document.querySelector('.chatbot-body');
-    const userName = JSON.parse(localStorage.getItem('user'))?.name || 'friend';
-    chatbotBody.innerHTML = `<div class="chatbot-message">Hey ${userName}, welcome! I’m here to help you find the perfect products from our collection! 😊</div>`;
+    chatbotBody.innerHTML = '<div class="chatbot-message">Hello! Let me help you find the perfect product from our vast collection!</div>';
 
     history.forEach(entry => {
         if (entry.type === 'message') {
@@ -243,7 +277,7 @@ function navigateProducts(container, direction) {
 
 function simulateThinking() {
     return new Promise(resolve => {
-        const delay = Math.random() * 1000 + 1000;
+        const delay = Math.random() * 1000 + 1000; // 1-2 seconds
         setTimeout(resolve, delay);
     });
 }
@@ -261,13 +295,12 @@ function sendMessageClick() {
 async function handleProductDetailQuery(userMessage, relevantFile, productTitle) {
     relevantFile = relevantFile.includes('.json') ? relevantFile : relevantFile + '.json';
     const products = allProductsCache[relevantFile] || [];
-    const userName = JSON.parse(localStorage.getItem('user'))?.name || 'friend';
     
     const product = products.find(p => p.title.toLowerCase().includes(productTitle.toLowerCase()));
     
     if (!product) {
         return {
-            responseText: `I couldn’t find that specific product, ${userName}. Could you clarify or ask about another item?`,
+            responseText: "I couldn’t find that specific product. Could you clarify or ask about another item?",
             products: []
         };
     }
@@ -276,18 +309,18 @@ async function handleProductDetailQuery(userMessage, relevantFile, productTitle)
         const material = product.material || 'not specified in the product details';
         if (material === 'not specified in the product details') {
             return {
-                responseText: `I don’t have material details for the ${product.title}, ${userName}, but it’s designed for comfort and style. Want more info about its features?`,
+                responseText: `I don’t have material details for the ${product.title}, but it’s designed for comfort and style. Would you like more information about its features?`,
                 products: []
             };
         }
         return {
-            responseText: `The ${product.title} is made of ${material}, ${userName}. Anything else you’d like to know about it?`,
+            responseText: `The ${product.title} is made of ${material}. Would you like more details about this product or something else?`,
             products: []
         };
     }
 
     return {
-        responseText: `I’m not sure which detail you’re asking about, ${userName}. Could you specify (e.g., material, size)?`,
+        responseText: "I’m not sure which detail you’re asking about. Could you specify (e.g., material, size)?",
         products: []
     };
 }
@@ -311,8 +344,8 @@ async function sendMessageCommon() {
 
     try {
         queryContext = loadQueryContext();
-        const userName = JSON.parse(localStorage.getItem('user'))?.name || 'friend';
 
+        // Handle tracking ID input
         if (queryContext.awaitingTrackingId) {
             typingIndicator.remove();
             queryContext.awaitingTrackingId = false;
@@ -322,13 +355,13 @@ async function sendMessageCommon() {
             if (trackingResult.success) {
                 const { order } = trackingResult;
                 const responseText = `
-                    Hey ${userName}, here’s the latest on your order (Tracking ID: ${order.trackingId}):
+                    ${JSON.parse(localStorage.getItem('user')).name}, here are the details for your order (Tracking ID: ${order.trackingId}):
                     - Status: ${order.status}
                     - Total Amount: $${order.totalAmount.toFixed(2)}
                     - Order Date: ${new Date(order.orderDate).toLocaleDateString()}
                     - Items: ${order.items.map(item => item.title).join(', ')}
                     - Shipping Address: ${order.address}
-                    Anything else I can help with, like finding new products?
+                    Would you like to track another order or check out more products?
                 `;
                 addMessageToChat(responseText, 'bot-message');
                 saveChatHistory({
@@ -338,7 +371,7 @@ async function sendMessageCommon() {
                     timestamp: new Date().toISOString()
                 });
             } else {
-                const responseText = `Oh no, ${userName}, I’m sorry but ${trackingResult.message}. Could you double-check the tracking ID or ask about something else?`;
+                const responseText = `Sorry, ${JSON.parse(localStorage.getItem('user')).name}, ${trackingResult.message}. Please provide a valid tracking ID or ask about something else.`;
                 addMessageToChat(responseText, 'bot-message');
                 saveChatHistory({
                     type: 'message',
@@ -350,12 +383,13 @@ async function sendMessageCommon() {
             return;
         }
 
+        // Handle confirmation responses
         if (queryContext.awaitingConfirmation) {
             const affirmativeResponses = ['yes', 'sure', 'okay', 'yep', 'show', 'please', 'yha', 'yeah', 'ok', 'yup'];
             const messageLower = message.toLowerCase();
             if (affirmativeResponses.some(word => messageLower.includes(word))) {
                 typingIndicator.remove();
-                const acknowledgment = `Awesome, ${userName}, let me find those ${queryContext.category.replace('.json', '').replace('./', '')} for you!`;
+                const acknowledgment = `Got it, let me find those ${queryContext.category.replace('.json', '').replace('./', '')} for you!`;
                 addMessageToChat(acknowledgment, 'bot-message');
                 saveChatHistory({
                     type: 'message',
@@ -379,17 +413,18 @@ async function sendMessageCommon() {
                 queryContext.pendingQuery = null;
                 queryContext.lastResponse = 'declined';
                 saveQueryContext(queryContext);
-                addMessageToChat(`No worries, ${userName}! How else can I help you today?`, 'bot-message');
+                addMessageToChat('Alright, let me know how else I can assist you!', 'bot-message');
                 saveChatHistory({
                     type: 'message',
                     sender: 'bot',
-                    message: `No worries, ${userName}! How else can I help you today?`,
+                    message: 'Alright, let me know how else I can assist you!',
                     timestamp: new Date().toISOString()
                 });
                 return;
             }
         }
 
+        // Check for product detail query
         if (queryContext.lastShownCategory && message.toLowerCase().includes('material')) {
             typingIndicator.remove();
             const productTitle = queryContext.lastQuery || message;
@@ -404,12 +439,13 @@ async function sendMessageCommon() {
             return;
         }
 
+        // Check for order tracking query
         const trackingKeywords = ['track', 'order status', 'where is my order', 'order tracking', 'delivery status'];
         if (trackingKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
             typingIndicator.remove();
             queryContext.awaitingTrackingId = true;
             saveQueryContext(queryContext);
-            const responseText = `Hey ${userName}, please share your tracking ID, and I’ll check your order status for you!`;
+            const responseText = `Please provide your tracking ID, ${JSON.parse(localStorage.getItem('user')).name}, and I'll check the status of your order.`;
             addMessageToChat(responseText, 'bot-message');
             saveChatHistory({
                 type: 'message',
@@ -420,14 +456,52 @@ async function sendMessageCommon() {
             return;
         }
 
+        // Check for cart content query
+        const cartKeywords = ["what's in my cart", 'cart contents', 'show my cart', 'cart items'];
+        if (cartKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
+            typingIndicator.remove();
+            const cartResult = await fetchCartContents();
+            const userName = JSON.parse(localStorage.getItem('user')).name;
+            if (cartResult.success && cartResult.items.length > 0) {
+                const itemList = cartResult.items.map(item => `- ${item.title} ($${item.price.toFixed(2)} x ${item.quantity})`).join('\n');
+                const responseText = `${userName}, here’s what’s in your cart:\n${itemList}\nWould you like to add more items or proceed to checkout?`;
+                addMessageToChat(responseText, 'bot-message');
+                saveChatHistory({
+                    type: 'message',
+                    sender: 'bot',
+                    message: responseText,
+                    timestamp: new Date().toISOString()
+                });
+            } else if (cartResult.success) {
+                const responseText = `${userName}, your cart is empty. Would you like to browse some products to add?`;
+                addMessageToChat(responseText, 'bot-message');
+                saveChatHistory({
+                    type: 'message',
+                    sender: 'bot',
+                    message: responseText,
+                    timestamp: new Date().toISOString()
+                });
+            } else {
+                const responseText = `Sorry, ${userName}, ${cartResult.message}. Please try again later.`;
+                addMessageToChat(responseText, 'bot-message');
+                saveChatHistory({
+                    type: 'message',
+                    sender: 'bot',
+                    message: responseText,
+                    timestamp: new Date().toISOString()
+                });
+            }
+            return;
+        }
+
         const fileAnalysisPrompt = `
-            You are a friendly and kind assistant named Alex for an e-commerce website, helping customers find products.
-            Your goal is to respond in a warm, human-like way without using gender-specific terms like "sir" or "ma'am."
+            You are an assistant for an e-commerce website.
             Analyze the user's message and determine:
             1. Is this a product-related query (yes/no)?
             2. If yes, which of these product files is most relevant (choose only one most relevant file or say "none")?
-            3. If the message is a follow-up like "show me more," "more," or "show," assume it refers to the last product category.
-            4. The user’s name is ${userName}, use their name in your responses to make it personal.
+            3. If the message explicitly mentions a new category (e.g., "glasses", "bags"), prioritize that category over the previous one, even if it's a follow-up.
+            4. Only assume it's a follow-up referring to the last category for vague queries like "show me more," "more," or "show."
+            5. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
             Product files available:
             - beanies caps for men women
             - branded hand women bags
@@ -469,13 +543,18 @@ async function sendMessageCommon() {
 
         typingIndicator.remove();
 
+        // Reset category if new product query with different category
+        if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile !== "none" && fileAnalysis.relevantFile !== queryContext.category) {
+            queryContext.category = fileAnalysis.relevantFile;
+            queryContext.shownProductIds = [];
+        }
+
         if (fileAnalysis.isFollowUp && queryContext.category) {
             fileAnalysis.isProductQuery = true;
             fileAnalysis.relevantFile = queryContext.category;
         }
 
         if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile !== "none") {
-            queryContext.category = fileAnalysis.relevantFile;
             queryContext.lastQuery = message;
             saveQueryContext(queryContext);
             await handleProductQuery(message, fileAnalysis.relevantFile);
@@ -485,11 +564,11 @@ async function sendMessageCommon() {
     } catch (error) {
         console.error('Error:', error);
         typingIndicator.remove();
-        addMessageToChat(`Oops, ${userName}, something went wrong. Let’s try that again!`, 'bot-message');
+        addMessageToChat('Sorry, I encountered an error processing your request. Please try again.', 'bot-message');
         saveChatHistory({
             type: 'message',
             sender: 'bot',
-            message: `Oops, ${userName}, something went wrong. Let’s try that again!`,
+            message: 'Sorry, I encountered an error processing your request. Please try again.',
             timestamp: new Date().toISOString()
         });
     }
@@ -497,8 +576,6 @@ async function sendMessageCommon() {
 
 async function handleProductQuery(userMessage, relevantFile) {
     relevantFile = relevantFile.includes('.json') ? relevantFile : relevantFile + '.json';
-    const userName = JSON.parse(localStorage.getItem('user'))?.name || 'friend';
-    
     if (!allProductsCache[relevantFile]) {
         try {
             const response = await fetch(relevantFile);
@@ -506,18 +583,19 @@ async function handleProductQuery(userMessage, relevantFile) {
             allProductsCache[relevantFile] = await response.json();
         } catch (error) {
             console.error('Error fetching product file:', error);
-            addMessageToChat(`Sorry, ${userName}, I couldn’t access the product information right now. Please try again later!`, 'bot-message');
+            addMessageToChat('Sorry, I couldn\'t access the product information. Please try again later.', 'bot-message');
             saveChatHistory({
                 type: 'message',
                 sender: 'bot',
-                message: `Sorry, ${userName}, I couldn’t access the product information right now. Please try again later!`,
+                message: 'Sorry, I couldn\'t access the product information. Please try again later.',
                 timestamp: new Date().toISOString()
             });
             return;
         }
     }
 
-    const confirmationMessage = `Hey ${userName}, we’ve got some awesome ${relevantFile.replace('.json', '').replace('./', '')} that match what you’re looking for! Want me to show you a few?`;
+    const userName = JSON.parse(localStorage.getItem('user')).name;
+    const confirmationMessage = `Great, ${userName}, we have some awesome ${relevantFile.replace('.json', '').replace('./', '')} matching your request! Would you like me to show them?`;
     addMessageToChat(confirmationMessage, 'bot-message');
     saveChatHistory({
         type: 'message',
@@ -536,23 +614,16 @@ async function displayPendingProducts(userMessage, relevantFile) {
     const products = allProductsCache[relevantFile];
     const chatContext = getChatContext();
     queryContext = loadQueryContext();
-    const userName = JSON.parse(localStorage.getItem('user'))?.name || 'friend';
     const priceThreshold = chatContext.includes('more then 10$') ? 10 : 0;
 
     const productPrompt = `
-        You are a friendly and kind e-commerce assistant named Alex helping a customer find products.
-        Your goal is to respond in a warm, human-like way without using gender-specific terms like "sir" or "ma'am."
-        The user’s name is ${userName}, use their name to make responses personal and engaging.
-        
+        You are an e-commerce assistant named Alex helping a customer find products.
         Here is the conversation history for context:
         ${chatContext}
-        
         Here are products from our "${relevantFile.replace('.json', '').replace('./', '')}" collection:
         ${JSON.stringify(products, null, 2)}
-        
         The user asked: "${userMessage}"
         Previously shown product IDs: ${JSON.stringify(queryContext.shownProductIds || [])}
-        
         Please:
         1. Select up to 5 relevant products that match the user's request, excluding previously shown products (based on product IDs if available, or titles otherwise).
         2. Filter products with a price greater than ${priceThreshold} if specified, otherwise show a mix of prices.
@@ -562,9 +633,10 @@ async function displayPendingProducts(userMessage, relevantFile) {
         6. If the user mentioned sunglasses and specified styles like aviators or wayfarers, prioritize those.
         7. For follow-up requests like "show me more," select new products not previously shown.
         8. If no products match or an error occurs, provide a fallback message suggesting alternative categories.
-        9. Return your response in this exact JSON format:
+        9. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
+        Return your response in this exact JSON format:
         {
-            "responseText": "Your friendly response to the user explaining the recommendations, e.g., 'Hey ${userName}, you asked for sunglasses, and I found some stylish options you’ll love!'",
+            "responseText": "Your friendly response to the user explaining the recommendations, referencing past conversation if relevant (e.g., 'You asked for sunglasses, here are five more stylish options, ${JSON.parse(localStorage.getItem('user')).name}!').",
             "products": [
                 {
                     "id": "asin -> product ID",
@@ -585,11 +657,11 @@ async function displayPendingProducts(userMessage, relevantFile) {
         const responseData = JSON.parse(productResponse.slice(jsonStart, jsonEnd));
 
         if (!responseData.products || responseData.products.length === 0) {
-            addMessageToChat(`Sorry, ${userName}, I couldn’t find more products matching your request. How about checking out some bags or caps instead?`, 'bot-message');
+            addMessageToChat('I couldn’t find more products matching your request. Would you like to see items from another category, like bags or caps?', 'bot-message');
             saveChatHistory({
                 type: 'message',
                 sender: 'bot',
-                message: `Sorry, ${userName}, I couldn’t find more products matching your request. How about checking out some bags or caps instead?`,
+                message: 'I couldn’t find more products matching your request. Would you like to see items from another category, like bags or caps?',
                 timestamp: new Date().toISOString()
             });
             return;
@@ -604,11 +676,11 @@ async function displayPendingProducts(userMessage, relevantFile) {
         );
 
         if (uniqueProducts.length === 0) {
-            addMessageToChat(`Looks like I’ve shown you all the ${relevantFile.replace('.json', '').replace('./', '')} we have, ${userName}! Want to explore another category?`, 'bot-message');
+            addMessageToChat('I’ve shown you all the available products in this category. Would you like to see something else?', 'bot-message');
             saveChatHistory({
                 type: 'message',
                 sender: 'bot',
-                message: `Looks like I’ve shown you all the ${relevantFile.replace('.json', '').replace('./', '')} we have, ${userName}! Want to explore another category?`,
+                message: 'I’ve shown you all the available products in this category. Would you like to see something else?',
                 timestamp: new Date().toISOString()
             });
             return;
@@ -631,7 +703,7 @@ async function displayPendingProducts(userMessage, relevantFile) {
             `;
             productsContainer.appendChild(productCard);
             queryContext.shownProductIds.push(product.id || product.title);
-
+        
             const addToCartButton = productCard.querySelector('.add-to-cart-btn');
             addToCartButton.addEventListener('click', () => {
                 addToCart({
@@ -643,7 +715,7 @@ async function displayPendingProducts(userMessage, relevantFile) {
                 });
             });
         });
-
+        
         if (uniqueProducts.length > 1) {
             const leftArrow = document.createElement('div');
             leftArrow.className = 'nav-arrow left';
@@ -669,20 +741,20 @@ async function displayPendingProducts(userMessage, relevantFile) {
         queryContext.lastShownCategory = queryContext.category;
         saveQueryContext(queryContext);
 
-        addMessageToChat(`What do you think of these, ${userName}? Scroll through using the arrows, or let me know if you’d like to see something else!`, 'bot-message');
+        addMessageToChat('What do you think of these? Use the arrows to browse, or let me know if you want more or something different.', 'bot-message');
         saveChatHistory({
             type: 'message',
             sender: 'bot',
-            message: `What do you think of these, ${userName}? Scroll through using the arrows, or let me know if you’d like to see something else!`,
+            message: 'What do you think of these? Use the arrows to browse, or let me know if you want more or something different.',
             timestamp: new Date().toISOString()
         });
     } catch (e) {
         console.error("Error parsing product response:", e);
-        addMessageToChat(`Oops, ${userName}, something went wrong while showing these products. Want to try a different category, like sunglasses or jackets?`, 'bot-message');
+        addMessageToChat('I found some products that might interest you, but had trouble displaying them properly. Try asking for a different category or specific style.', 'bot-message');
         saveChatHistory({
             type: 'message',
             sender: 'bot',
-            message: `Oops, ${userName}, something went wrong while showing these products. Want to try a different category, like sunglasses or jackets?`,
+            message: 'I found some products that might interest you, but had trouble displaying them properly. Try asking for a different category or specific style.',
             timestamp: new Date().toISOString()
         });
     }
@@ -690,35 +762,16 @@ async function displayPendingProducts(userMessage, relevantFile) {
 
 async function handleGeneralQuery(userMessage) {
     const chatContext = getChatContext();
-    const userName = JSON.parse(localStorage.getItem('user'))?.name || 'friend';
-
-    const cancellationKeywords = ['cancel', 'canceled', 'cancellation', 'order not delivered', 'issue with order'];
-    if (cancellationKeywords.some(keyword => userMessage.toLowerCase().includes(keyword))) {
-        const responseText = `Oh, ${userName}, I’m so sorry to hear about the issue with your order! 😔 Could you share more details, like your tracking ID, so I can help sort this out for you?`;
-        addMessageToChat(responseText, 'bot-message');
-        saveChatHistory({
-            type: 'message',
-            sender: 'bot',
-            message: responseText,
-            timestamp: new Date().toISOString()
-        });
-        queryContext.awaitingTrackingId = true;
-        saveQueryContext(queryContext);
-        return;
-    }
-
     const generalPrompt = `
-        You are a friendly and kind e-commerce assistant named Alex, helping customers with clothing and accessories.
-        Your goal is to respond in a warm, human-like way without using gender-specific terms like "sir" or "ma'am."
-        The user’s name is ${userName}, use their name to make responses personal and engaging.
+        You are a helpful assistant for an e-commerce website that sells clothing and accessories.
+        The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
         Here is the conversation history for context:
         ${chatContext}
-        
         The user asked: "${userMessage}"
-        
-        Please provide a helpful, empathetic response in 2-3 sentences, referencing past conversation if relevant (e.g., 'You were looking for sunglasses, ${userName}, would you like to see more?').
-        If the query is related to products we might sell (like fashion advice or styling tips), mention that we have relevant products and suggest they ask about specific items like sunglasses, bags, or caps.
-        Keep your tone warm, concise, and engaging.
+        Please provide a helpful response, referencing past conversation if relevant (e.g., 'You were looking for sunglasses, would you like to see more, ${JSON.parse(localStorage.getItem('user')).name}?').
+        If the query is related to products we might sell (like fashion advice, styling tips, etc.),
+        mention that we have relevant products and suggest they ask about specific items like sunglasses, bags, or caps.
+        Keep your response friendly, concise (2-3 sentences max), and engaging.
     `;
 
     const response = await callGeminiAPI(generalPrompt);
@@ -765,15 +818,14 @@ function addMessageToChat(text, className, save = true) {
 }
 
 async function showProductPopup(product) {
-    const userName = JSON.parse(localStorage.getItem('user'))?.name || 'friend';
     const insightPrompt = `
-        You are an enthusiastic e-commerce assistant named Alex. Generate a short, exciting comment about the user's product choice.
+        You are an enthusiastic e-commerce assistant. Generate a short, exciting comment about the user's product choice.
         Product: ${product.title}
-        Keep it positive, engaging, and max 1 sentence.
-        Example: "Wow, ${userName}, you picked a stylish gem that's perfect for any occasion!"
+        Keep it positive and engaging, max 1 sentence.
+        Example: "Wow, you picked a stylish gem that's perfect for any occasion, ${JSON.parse(localStorage.getItem('user')).name}!"
     `;
 
-    let insight = `Wow, ${userName}, you’ve chosen an amazing product!`;
+    let insight = `Wow, you've chosen an amazing product, ${JSON.parse(localStorage.getItem('user')).name}!`;
     try {
         const insightResponse = await callGeminiAPI(insightPrompt);
         insight = insightResponse.trim();
@@ -837,6 +889,7 @@ async function updateCartItemCount() {
         }
       });
       const data = await response.json();
+      console.log(data);
       
       if (response.ok) {
         cartItemsCount.textContent = data.count || 0;
@@ -845,8 +898,8 @@ async function updateCartItemCount() {
         cartItemsCount.textContent = "0";
       }
     } catch (error) {
-        console.error("Error fetching cart count:", error);
-        cartItemsCount.textContent = "0";
+      console.error("Error fetching cart count:", error);
+      cartItemsCount.textContent = "0";
     }
 }
 
