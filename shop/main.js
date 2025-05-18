@@ -457,12 +457,14 @@ async function sendMessageCommon() {
             } else {
                 const responseText = `Sorry, ${userName}, ${cartResult.message}. Please try again later or visit the cart page to view your items.`;
                 addMessageToChat(responseText, 'bot-message');
-                savehardware
-                    type: 'message',
+                saveChatHistory({
+                     type: 'message',
                     sender: 'bot',
                     message: responseText,
                     timestamp: new Date().toISOString()
-                });
+                })
+                   
+             
             }
             return;
         }
