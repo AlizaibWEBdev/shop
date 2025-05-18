@@ -431,7 +431,7 @@ async function sendMessageCommon() {
             'view cart', 'my cart', 'cart details'
         ];
         const messageLower = message.toLowerCase();
-        if (cartKeywords.some(keyword => messageLower.includes(keyword))) {
+        if (cartKeywords.includes(messageLower)) {
             typingIndicator.remove();
             const cartResult = await fetchCartContents();
             const userName = JSON.parse(localStorage.getItem('user')).name;
