@@ -1,7 +1,7 @@
 let allProductsCache = {};
 let queryContext = {};
 const API_KEY = "AIzaSyDHbhK8_EZRJ_Br6MsviB2Pu6BuE6KctVg";
-const MAX_CHAT_HISTORY = 50;
+const MAX_CHAT_HISTORY = 10;
 
 const productFiles = [
     "./beanies caps for men women.json",
@@ -31,8 +31,6 @@ function saveChatHistory(entry) {
     if (history.length > MAX_CHAT_HISTORY) {
         history = history.slice(-MAX_CHAT_HISTORY);
     }
-    console.log(history);
-    
     localStorage.setItem('chatHistory', JSON.stringify(history));
 }
 
@@ -46,7 +44,8 @@ function loadQueryContext() {
         pendingQuery: null,
         lastShownCategory: null,
         lastResponse: null,
-        awaitingTrackingId: false
+        awaitingTrackingId: false,
+        currentCartItems: [] // Added to track cart items
     };
 }
 
@@ -54,11 +53,35 @@ function saveQueryContext(context) {
     localStorage.setItem('queryContext', JSON.stringify(context));
 }
 
-async function addToCart(product) {
-    let quantity = 1; // Default quantity
-    const { id, title, price, imageUrl, user_id } = product;
+async function getCartItems() {
+    const userId = JSON.parse(localStorage.getItem('user'))?.id;
+    if (!userId) return [];
 
-    console.log(id, title, price, imageUrl, user_id);
+    try {
+        const response = await fetch(`https://fitsedit.tooliso.com/cart/getdata?user_id=${userId}`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem('token')}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            queryContext.currentCartItems = data;
+            saveQueryContext(queryContext);
+            return data;
+        }
+        return [];
+    } catch (error) {
+        console.error("Error fetching cart:", error);
+        return [];
+    }
+}
+
+async function addToCart(product) {
+    let quantity = 1;
+    const { id, title, price, imageUrl, user_id } = product;
     
     if (!id || !title || !price || !imageUrl || !user_id) {
         console.error("Missing required product fields");
@@ -84,14 +107,16 @@ async function addToCart(product) {
 
         const data = await response.json();
         updateCartItemCount();
+        await getCartItems(); // Refresh cart items in context
         if (response.ok) {
-            alert("Product added to cart successfully!");
+            showToast("Product added to cart successfully!", "success");
             return data;
         } else {
-            alert(data.message);
+            showToast(data.message, "error");
         }
     } catch (err) {
         console.error("Server error:", err);
+        showToast("Failed to add product to cart", "error");
     }
 }
 
@@ -131,34 +156,6 @@ async function trackOrder(trackingId) {
     }
 }
 
-async function fetchCartContents() {
-    const userId = JSON.parse(localStorage.getItem('user'))?.id;
-    const token = localStorage.getItem('token');
-    if (!userId || !token) {
-        return { success: false, message: 'User not logged in' };
-    }
-
-    try {
-        const response = await fetch(`https://fitsedit.tooliso.com/cart?user_id=${userId}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const data = await response.json();
-        if (response.ok) {
-            return { success: true, items: data.items || [] };
-        } else {
-            return { success: false, message: data.message || 'Failed to fetch cart contents' };
-        }
-    } catch (error) {
-        console.error('Error fetching cart contents:', error);
-        return { success: false, message: 'Server error while fetching cart contents' };
-    }
-}
-
 function getChatContext() {
     const history = loadChatHistory();
     const context = loadQueryContext();
@@ -166,11 +163,9 @@ function getChatContext() {
         .filter(h => h.type === 'message')
         .map(h => `${h.sender}: ${h.message}`)
         .join('\n');
-    if (context.lastQuery) {
-        contextString += `\nMost recent user query: ${context.lastQuery}`;
-    }
-    if (context.category) {
-        contextString += `\nCurrent product category (if still relevant): ${context.category || 'none'}`;
+    
+    if (context.category || context.lastQuery) {
+        contextString += `\nCurrent product category: ${context.category || 'none'}\nLast query: ${context.lastQuery || 'none'}`;
     }
     if (context.lastShownCategory) {
         contextString += `\nLast shown category: ${context.lastShownCategory}`;
@@ -178,6 +173,12 @@ function getChatContext() {
     if (context.awaitingTrackingId) {
         contextString += `\nAwaiting tracking ID: true`;
     }
+    
+    // Add cart information to context
+    if (context.currentCartItems && context.currentCartItems.length > 0) {
+        contextString += `\nCart contains: ${context.currentCartItems.map(item => `${item.title} (${item.quantity}x)`).join(', ')}`;
+    }
+    
     return contextString;
 }
 
@@ -202,67 +203,72 @@ function loadChatMessages() {
                 false
             );
         } else if (entry.type === 'products') {
-            const productsContainer = document.createElement('div');
-            productsContainer.className = 'product-recommendations';
-            productsContainer.dataset.currentIndex = '0';
-
-            entry.products.forEach((product, index) => {
-                const productCard = document.createElement('div');
-                productCard.className = `chatbot-product-card ${index === 0 ? 'active' : ''}`;
-                productCard.dataset.index = index;
-                productCard.innerHTML = `
-                    <img src="${product.imageUrl}" alt="${product.title}" class="product-image">
-                    <div class="product-info">
-                        <h4>${product.title}</h4>
-                        <p>${product.description}</p>
-                        <p class="product-price">${product.price}</p>
-                        <p class="product-reason"><em>${product.reason}</em></p>
-                        <button class="view-product-btn">View Product</button>
-                    </div>
-                `;
-
-                const addToCartButton = document.createElement('button');
-                addToCartButton.className = 'view-product-btn';
-                addToCartButton.textContent = '+ Add to Cart';
-                
-                addToCartButton.addEventListener('click', () => {
-                    addToCart({
-                        imageUrl: product.imageUrl,
-                        title: product.title,
-                        price: parseInt(product.price.replace('$', '')),
-                        id: product.id,
-                        user_id: JSON.parse(localStorage.getItem('user')).id
-                    });
-                });
-
-                const productInfoDiv = productCard.querySelector('.product-info');
-                productInfoDiv.appendChild(addToCartButton);
-
-                const viewProductButton = productCard.querySelector('.view-product-btn');
-                viewProductButton.addEventListener('click', () => {
-                    showProductPopup(product);
-                });
-
-                productsContainer.appendChild(productCard);
-            });
-
-            if (entry.products.length > 1) {
-                const leftArrow = document.createElement('div');
-                leftArrow.className = 'nav-arrow left';
-                leftArrow.innerHTML = '<i class="fas fa-chevron-left"></i>';
-                leftArrow.onclick = () => navigateProducts(productsContainer, -1);
-                productsContainer.appendChild(leftArrow);
-
-                const rightArrow = document.createElement('div');
-                rightArrow.className = 'nav-arrow right';
-                rightArrow.innerHTML = '<i class="fas fa-chevron-right"></i>';
-                rightArrow.onclick = () => navigateProducts(productsContainer, 1);
-                productsContainer.appendChild(rightArrow);
-            }
-
-            chatbotBody.appendChild(productsContainer);
+            renderProductCards(entry.products);
         }
     });
+}
+
+function renderProductCards(products) {
+    const chatbotBody = document.querySelector('.chatbot-body');
+    const productsContainer = document.createElement('div');
+    productsContainer.className = 'product-recommendations';
+    productsContainer.dataset.currentIndex = '0';
+
+    products.forEach((product, index) => {
+        const productCard = document.createElement('div');
+        productCard.className = `chatbot-product-card ${index === 0 ? 'active' : ''}`;
+        productCard.dataset.index = index;
+        productCard.innerHTML = `
+            <img src="${product.imageUrl}" alt="${product.title}" class="product-image">
+            <div class="product-info">
+                <h4>${product.title}</h4>
+                <p>${product.description}</p>
+                <p class="product-price">${product.price}</p>
+                <p class="product-reason"><em>${product.reason}</em></p>
+                <button class="view-product-btn">View Product</button>
+            </div>
+        `;
+
+        const addToCartButton = document.createElement('button');
+        addToCartButton.className = 'view-product-btn';
+        addToCartButton.textContent = '+ Add to Cart';
+        
+        addToCartButton.addEventListener('click', () => {
+            addToCart({
+                imageUrl: product.imageUrl,
+                title: product.title,
+                price: parseInt(product.price.replace('$', '')),
+                id: product.id,
+                user_id: JSON.parse(localStorage.getItem('user')).id
+            });
+        });
+
+        const productInfoDiv = productCard.querySelector('.product-info');
+        productInfoDiv.appendChild(addToCartButton);
+
+        const viewProductButton = productCard.querySelector('.view-product-btn');
+        viewProductButton.addEventListener('click', () => {
+            showProductPopup(product);
+        });
+
+        productsContainer.appendChild(productCard);
+    });
+
+    if (products.length > 1) {
+        const leftArrow = document.createElement('div');
+        leftArrow.className = 'nav-arrow left';
+        leftArrow.innerHTML = '<i class="fas fa-chevron-left"></i>';
+        leftArrow.onclick = () => navigateProducts(productsContainer, -1);
+        productsContainer.appendChild(leftArrow);
+
+        const rightArrow = document.createElement('div');
+        rightArrow.className = 'nav-arrow right';
+        rightArrow.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        rightArrow.onclick = () => navigateProducts(productsContainer, 1);
+        productsContainer.appendChild(rightArrow);
+    }
+
+    chatbotBody.appendChild(productsContainer);
 }
 
 function navigateProducts(container, direction) {
@@ -277,7 +283,7 @@ function navigateProducts(container, direction) {
 
 function simulateThinking() {
     return new Promise(resolve => {
-        const delay = Math.random() * 1000 + 1000; // 1-2 seconds
+        const delay = Math.random() * 1000 + 1000;
         setTimeout(resolve, delay);
     });
 }
@@ -300,7 +306,7 @@ async function handleProductDetailQuery(userMessage, relevantFile, productTitle)
     
     if (!product) {
         return {
-            responseText: "I couldn’t find that specific product. Could you clarify or ask about another item?",
+            responseText: "I couldn't find that specific product. Could you clarify or ask about another item?",
             products: []
         };
     }
@@ -309,7 +315,7 @@ async function handleProductDetailQuery(userMessage, relevantFile, productTitle)
         const material = product.material || 'not specified in the product details';
         if (material === 'not specified in the product details') {
             return {
-                responseText: `I don’t have material details for the ${product.title}, but it’s designed for comfort and style. Would you like more information about its features?`,
+                responseText: `I don't have material details for the ${product.title}, but it's designed for comfort and style. Would you like more information about its features?`,
                 products: []
             };
         }
@@ -320,7 +326,7 @@ async function handleProductDetailQuery(userMessage, relevantFile, productTitle)
     }
 
     return {
-        responseText: "I’m not sure which detail you’re asking about. Could you specify (e.g., material, size)?",
+        responseText: "I'm not sure which detail you're asking about. Could you specify (e.g., material, size)?",
         products: []
     };
 }
@@ -328,9 +334,9 @@ async function handleProductDetailQuery(userMessage, relevantFile, productTitle)
 async function sendMessageCommon() {
     const input = document.getElementById('chatbotInput');
     const message = input.value.trim();
-
     if (!message) return;
 
+    const userName = JSON.parse(localStorage.getItem('user'))?.name || '';
     addMessageToChat(message, 'user-message');
     saveChatHistory({
         type: 'message',
@@ -355,7 +361,7 @@ async function sendMessageCommon() {
             if (trackingResult.success) {
                 const { order } = trackingResult;
                 const responseText = `
-                    ${JSON.parse(localStorage.getItem('user')).name}, here are the details for your order (Tracking ID: ${order.trackingId}):
+                    ${userName}, here are the details for your order (Tracking ID: ${order.trackingId}):
                     - Status: ${order.status}
                     - Total Amount: $${order.totalAmount.toFixed(2)}
                     - Order Date: ${new Date(order.orderDate).toLocaleDateString()}
@@ -371,7 +377,41 @@ async function sendMessageCommon() {
                     timestamp: new Date().toISOString()
                 });
             } else {
-                const responseText = `Sorry, ${JSON.parse(localStorage.getItem('user')).name}, ${trackingResult.message}. Please provide a valid tracking ID or ask about something else.`;
+                const responseText = `Sorry, ${userName}, ${trackingResult.message}. Please provide a valid tracking ID or ask about something else.`;
+                addMessageToChat(responseText, 'bot-message');
+                saveChatHistory({
+                    type: 'message',
+                    sender: 'bot',
+                    message: responseText,
+                    timestamp: new Date().toISOString()
+                });
+            }
+            return;
+        }
+
+        // Handle cart inquiries
+        const cartKeywords = ['cart', 'whats in my cart', 'my cart', 'shopping cart'];
+        if (cartKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
+            typingIndicator.remove();
+            await getCartItems(); // Refresh cart items
+            
+            if (queryContext.currentCartItems && queryContext.currentCartItems.length > 0) {
+                const cartItemsText = queryContext.currentCartItems.map(item => 
+                    `${item.title} (${item.quantity}x) - $${(item.price * item.quantity).toFixed(2)}`
+                ).join('\n');
+                
+                const total = queryContext.currentCartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                
+                const responseText = `${userName}, your cart contains:\n${cartItemsText}\n\nTotal: $${total.toFixed(2)}\n\nWould you like to proceed to checkout or continue shopping?`;
+                addMessageToChat(responseText, 'bot-message');
+                saveChatHistory({
+                    type: 'message',
+                    sender: 'bot',
+                    message: responseText,
+                    timestamp: new Date().toISOString()
+                });
+            } else {
+                const responseText = `${userName}, your cart is currently empty. Would you like to browse some products?`;
                 addMessageToChat(responseText, 'bot-message');
                 saveChatHistory({
                     type: 'message',
@@ -386,10 +426,12 @@ async function sendMessageCommon() {
         // Handle confirmation responses
         if (queryContext.awaitingConfirmation) {
             const affirmativeResponses = ['yes', 'sure', 'okay', 'yep', 'show', 'please', 'yha', 'yeah', 'ok', 'yup'];
+            const negativeResponses = ['no', 'not now', 'later', 'nope', 'stop', 'done'];
             const messageLower = message.toLowerCase();
+            
             if (affirmativeResponses.some(word => messageLower.includes(word))) {
                 typingIndicator.remove();
-                const acknowledgment = `Got it, let me find those ${queryContext.category.replace('.json', '').replace('./', '')} for you!`;
+                const acknowledgment = `${userName ? userName + ', ' : ''}Let me find those ${queryContext.category.replace('.json', '').replace('./', '')} for you!`;
                 addMessageToChat(acknowledgment, 'bot-message');
                 saveChatHistory({
                     type: 'message',
@@ -407,7 +449,7 @@ async function sendMessageCommon() {
                 queryContext.lastResponse = 'confirmed';
                 saveQueryContext(queryContext);
                 return;
-            } else {
+            } else if (negativeResponses.some(word => messageLower.includes(word))) {
                 typingIndicator.remove();
                 queryContext.awaitingConfirmation = false;
                 queryContext.pendingQuery = null;
@@ -424,8 +466,8 @@ async function sendMessageCommon() {
             }
         }
 
-        // Check for product detail query
-        if (queryContext.lastShownCategory && message.toLowerCase().includes('material')) {
+        // Check for product detail query (e.g., material, size)
+        if (queryContext.lastShownCategory && (message.toLowerCase().includes('material') || message.toLowerCase().includes('size'))) {
             typingIndicator.remove();
             const productTitle = queryContext.lastQuery || message;
             const detailResponse = await handleProductDetailQuery(message, queryContext.lastShownCategory, productTitle);
@@ -445,7 +487,7 @@ async function sendMessageCommon() {
             typingIndicator.remove();
             queryContext.awaitingTrackingId = true;
             saveQueryContext(queryContext);
-            const responseText = `Please provide your tracking ID, ${JSON.parse(localStorage.getItem('user')).name}, and I'll check the status of your order.`;
+            const responseText = `Please provide your tracking ID, ${userName}, and I'll check the status of your order.`;
             addMessageToChat(responseText, 'bot-message');
             saveChatHistory({
                 type: 'message',
@@ -456,42 +498,37 @@ async function sendMessageCommon() {
             return;
         }
 
-        // Check for cart content query
-        const cartKeywords = ["what's in my cart", 'cart contents', 'show my cart', 'cart items'];
-        if (cartKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
-            typingIndicator.remove();
-            const cartResult = await fetchCartContents();
-            const userName = JSON.parse(localStorage.getItem('user')).name;
-            if (cartResult.success && cartResult.items.length > 0) {
-                const itemList = cartResult.items.map(item => `- ${item.title} ($${item.price.toFixed(2)} x ${item.quantity})`).join('\n');
-                const responseText = `${userName}, here’s what’s in your cart:\n${itemList}\nWould you like to add more items or proceed to checkout?`;
-                addMessageToChat(responseText, 'bot-message');
+        // Check for clear intent to switch categories
+        const switchKeywords = ['show me', 'i want', 'looking for', 'now please show me'];
+        const productCategories = productFiles.map(f => f.replace('.json', '').replace('./', ''));
+        
+        if (switchKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
+            const requestedCategory = productCategories.find(cat => 
+                message.toLowerCase().includes(cat.toLowerCase())
+            );
+            
+            if (requestedCategory) {
+                typingIndicator.remove();
+                queryContext.category = `./${requestedCategory}.json`;
+                queryContext.lastQuery = message;
+                queryContext.shownProductIds = [];
+                saveQueryContext(queryContext);
+                
+                const acknowledgment = `${userName ? userName + ', ' : ''}I'll show you ${requestedCategory} instead.`;
+                addMessageToChat(acknowledgment, 'bot-message');
                 saveChatHistory({
                     type: 'message',
                     sender: 'bot',
-                    message: responseText,
+                    message: acknowledgment,
                     timestamp: new Date().toISOString()
                 });
-            } else if (cartResult.success) {
-                const responseText = `${userName}, your cart is empty. Would you like to browse some products to add?`;
-                addMessageToChat(responseText, 'bot-message');
-                saveChatHistory({
-                    type: 'message',
-                    sender: 'bot',
-                    message: responseText,
-                    timestamp: new Date().toISOString()
-                });
-            } else {
-                const responseText = `Sorry, ${userName}, ${cartResult.message}. Please try again later.`;
-                addMessageToChat(responseText, 'bot-message');
-                saveChatHistory({
-                    type: 'message',
-                    sender: 'bot',
-                    message: responseText,
-                    timestamp: new Date().toISOString()
-                });
+
+                await simulateThinking();
+                const thinkingIndicator = addMessageToChat('Searching for the best options...', 'typing-indicator');
+                await displayPendingProducts(message, queryContext.category);
+                thinkingIndicator.remove();
+                return;
             }
-            return;
         }
 
         const fileAnalysisPrompt = `
@@ -499,24 +536,12 @@ async function sendMessageCommon() {
             Analyze the user's message and determine:
             1. Is this a product-related query (yes/no)?
             2. If yes, which of these product files is most relevant (choose only one most relevant file or say "none")?
-            3. If the message explicitly mentions a new category (e.g., "glasses", "bags"), prioritize that category over the previous one, even if it's a follow-up.
-            4. Only assume it's a follow-up referring to the last category for vague queries like "show me more," "more," or "show."
-            5. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
+            3. If the message is a follow-up like "show me more," "more," or "show," assume it refers to the last product category.
+            4. The user who is talking with you is named ${userName} - use this name in your response.
+            5. Consider if the user wants to switch categories (e.g., from shoes to glasses).
+            
             Product files available:
-            - beanies caps for men women
-            - branded hand women bags
-            - Formal Dresses_men
-            - Formal Dresses_women
-            - high end shoes for men
-            - high end shoes for women
-            - lather jackets men
-            - lather jackets women
-            - socks for men
-            - socks for women
-            - sunglasses mens
-            - sunglasses womens
-            - tshirts shirts for men
-            - tshirts shirts for women
+            ${productFiles.map(f => `- ${f.replace('.json', '').replace('./', '')}`).join('\n')}
             
             User message: "${message}"
             Conversation history: ${getChatContext()}
@@ -525,7 +550,8 @@ async function sendMessageCommon() {
             {
                 "isProductQuery": true/false,
                 "relevantFile": "filename.json" or "none",
-                "isFollowUp": true/false
+                "isFollowUp": true/false,
+                "shouldSwitchCategory": true/false
             }
         `;
 
@@ -538,23 +564,23 @@ async function sendMessageCommon() {
             fileAnalysis = JSON.parse(fileAnalysisResponse.slice(jsonStart, jsonEnd));
         } catch (e) {
             console.error("Error parsing file analysis response:", e);
-            fileAnalysis = { isProductQuery: false, relevantFile: "none", isFollowUp: false };
+            fileAnalysis = { isProductQuery: false, relevantFile: "none", isFollowUp: false, shouldSwitchCategory: false };
         }
 
         typingIndicator.remove();
 
-        // Reset category if new product query with different category
-        if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile !== "none" && fileAnalysis.relevantFile !== queryContext.category) {
-            queryContext.category = fileAnalysis.relevantFile;
-            queryContext.shownProductIds = [];
-        }
-
-        if (fileAnalysis.isFollowUp && queryContext.category) {
+        if (fileAnalysis.isFollowUp && queryContext.category && !fileAnalysis.shouldSwitchCategory) {
             fileAnalysis.isProductQuery = true;
             fileAnalysis.relevantFile = queryContext.category;
         }
 
         if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile !== "none") {
+            // If switching categories, reset shown products
+            if (fileAnalysis.shouldSwitchCategory) {
+                queryContext.shownProductIds = [];
+            }
+            
+            queryContext.category = fileAnalysis.relevantFile;
             queryContext.lastQuery = message;
             saveQueryContext(queryContext);
             await handleProductQuery(message, fileAnalysis.relevantFile);
@@ -594,8 +620,8 @@ async function handleProductQuery(userMessage, relevantFile) {
         }
     }
 
-    const userName = JSON.parse(localStorage.getItem('user')).name;
-    const confirmationMessage = `Great, ${userName}, we have some awesome ${relevantFile.replace('.json', '').replace('./', '')} matching your request! Would you like me to show them?`;
+    const userName = JSON.parse(localStorage.getItem('user'))?.name || '';
+    const confirmationMessage = `${userName ? userName + ', ' : ''}We have some great ${relevantFile.replace('.json', '').replace('./', '')} matching your request! Would you like me to show them?`;
     addMessageToChat(confirmationMessage, 'bot-message');
     saveChatHistory({
         type: 'message',
@@ -617,29 +643,31 @@ async function displayPendingProducts(userMessage, relevantFile) {
     const priceThreshold = chatContext.includes('more then 10$') ? 10 : 0;
 
     const productPrompt = `
-        You are an e-commerce assistant named Alex helping a customer find products.
+        You are an e-commerce assistant helping a customer find products.
+        
         Here is the conversation history for context:
         ${chatContext}
+        
         Here are products from our "${relevantFile.replace('.json', '').replace('./', '')}" collection:
         ${JSON.stringify(products, null, 2)}
+        
         The user asked: "${userMessage}"
         Previously shown product IDs: ${JSON.stringify(queryContext.shownProductIds || [])}
+        
         Please:
-        1. Select up to 5 relevant products that match the user's request, excluding previously shown products (based on product IDs if available, or titles otherwise).
-        2. Filter products with a price greater than ${priceThreshold} if specified, otherwise show a mix of prices.
-        3. Consider price, features, user's implied needs (e.g., caps, bags, sunglasses), and conversation history.
-        4. If the user mentioned caps, prioritize baseball caps, beanies, or sun hats.
-        5. If the user mentioned bags, prioritize handbags or similar accessories.
-        6. If the user mentioned sunglasses and specified styles like aviators or wayfarers, prioritize those.
-        7. For follow-up requests like "show me more," select new products not previously shown.
-        8. If no products match or an error occurs, provide a fallback message suggesting alternative categories.
-        9. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
+        1. Select up to 5 relevant products that match the user's request
+        2. Filter products with a price greater than ${priceThreshold} if specified
+        3. Consider price, features, user's implied needs
+        4. For follow-up requests, select new products not previously shown
+        5. If no products match, provide a fallback message
+        6. The user's name is ${JSON.parse(localStorage.user).name} - use it in your response
+        
         Return your response in this exact JSON format:
         {
-            "responseText": "Your friendly response to the user explaining the recommendations, referencing past conversation if relevant (e.g., 'You asked for sunglasses, here are five more stylish options, ${JSON.parse(localStorage.getItem('user')).name}!').",
+            "responseText": "Your friendly response to the user",
             "products": [
                 {
-                    "id": "asin -> product ID",
+                    "id": "product ID",
                     "title": "Product name",
                     "description": "Brief description",
                     "price": "Price",
@@ -657,80 +685,32 @@ async function displayPendingProducts(userMessage, relevantFile) {
         const responseData = JSON.parse(productResponse.slice(jsonStart, jsonEnd));
 
         if (!responseData.products || responseData.products.length === 0) {
-            addMessageToChat('I couldn’t find more products matching your request. Would you like to see items from another category, like bags or caps?', 'bot-message');
+            addMessageToChat('I couldn\'t find more products matching your request. Would you like to see items from another category?', 'bot-message');
             saveChatHistory({
                 type: 'message',
                 sender: 'bot',
-                message: 'I couldn’t find more products matching your request. Would you like to see items from another category, like bags or caps?',
+                message: 'I couldn\'t find more products matching your request. Would you like to see items from another category?',
                 timestamp: new Date().toISOString()
             });
             return;
         }
-
-        const productsContainer = document.createElement('div');
-        productsContainer.className = 'product-recommendations';
-        productsContainer.dataset.currentIndex = '0';
 
         const uniqueProducts = responseData.products.filter(product =>
             !queryContext.shownProductIds.includes(product.id || product.title)
         );
 
         if (uniqueProducts.length === 0) {
-            addMessageToChat('I’ve shown you all the available products in this category. Would you like to see something else?', 'bot-message');
+            addMessageToChat('I\'ve shown you all the available products in this category. Would you like to see something else?', 'bot-message');
             saveChatHistory({
                 type: 'message',
                 sender: 'bot',
-                message: 'I’ve shown you all the available products in this category. Would you like to see something else?',
+                message: 'I\'ve shown you all the available products in this category. Would you like to see something else?',
                 timestamp: new Date().toISOString()
             });
             return;
         }
 
-        uniqueProducts.forEach((product, index) => {
-            const productCard = document.createElement('div');
-            productCard.className = `chatbot-product-card ${index === 0 ? 'active' : ''}`;
-            productCard.dataset.index = index;
-            productCard.innerHTML = `
-                <img src="${product.imageUrl}" alt="${product.title}" class="product-image">
-                <div class="product-info">
-                    <h4>${product.title}</h4>
-                    <p>${product.description}</p>
-                    <p class="product-price">${product.price}</p>
-                    <p class="product-reason"><em>${product.reason}</em></p>
-                    <button class="view-product-btn" onclick='showProductPopup(${JSON.stringify(product)})'>View Product</button>
-                    <button class="view-product-btn add-to-cart-btn">+ Add to Cart</button>
-                </div>
-            `;
-            productsContainer.appendChild(productCard);
-            queryContext.shownProductIds.push(product.id || product.title);
-        
-            const addToCartButton = productCard.querySelector('.add-to-cart-btn');
-            addToCartButton.addEventListener('click', () => {
-                addToCart({
-                    imageUrl: product.imageUrl,
-                    title: product.title,
-                    price: parseInt(product.price.replace('$', '')) || 0,
-                    id: product.id,
-                    user_id: JSON.parse(localStorage.getItem('user')).id
-                });
-            });
-        });
-        
-        if (uniqueProducts.length > 1) {
-            const leftArrow = document.createElement('div');
-            leftArrow.className = 'nav-arrow left';
-            leftArrow.innerHTML = '<i class="fas fa-chevron-left"></i>';
-            leftArrow.onclick = () => navigateProducts(productsContainer, -1);
-            productsContainer.appendChild(leftArrow);
-
-            const rightArrow = document.createElement('div');
-            rightArrow.className = 'nav-arrow right';
-            rightArrow.innerHTML = '<i class="fas fa-chevron-right"></i>';
-            rightArrow.onclick = () => navigateProducts(productsContainer, 1);
-            productsContainer.appendChild(rightArrow);
-        }
-
-        document.querySelector('.chatbot-body').appendChild(productsContainer);
+        renderProductCards(uniqueProducts);
 
         saveChatHistory({
             type: 'products',
@@ -750,11 +730,11 @@ async function displayPendingProducts(userMessage, relevantFile) {
         });
     } catch (e) {
         console.error("Error parsing product response:", e);
-        addMessageToChat('I found some products that might interest you, but had trouble displaying them properly. Try asking for a different category or specific style.', 'bot-message');
+        addMessageToChat('I found some products that might interest you, but had trouble displaying them properly. Try asking for a different category.', 'bot-message');
         saveChatHistory({
             type: 'message',
             sender: 'bot',
-            message: 'I found some products that might interest you, but had trouble displaying them properly. Try asking for a different category or specific style.',
+            message: 'I found some products that might interest you, but had trouble displaying them properly. Try asking for a different category.',
             timestamp: new Date().toISOString()
         });
     }
@@ -763,15 +743,17 @@ async function displayPendingProducts(userMessage, relevantFile) {
 async function handleGeneralQuery(userMessage) {
     const chatContext = getChatContext();
     const generalPrompt = `
-        You are a helpful assistant for an e-commerce website that sells clothing and accessories.
-        The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
-        Here is the conversation history for context:
+        You are a helpful assistant for an e-commerce website.
+        The user's name is ${JSON.parse(localStorage.user).name} - use it in your response.
+        
+        Conversation history:
         ${chatContext}
-        The user asked: "${userMessage}"
-        Please provide a helpful response, referencing past conversation if relevant (e.g., 'You were looking for sunglasses, would you like to see more, ${JSON.parse(localStorage.getItem('user')).name}?').
-        If the query is related to products we might sell (like fashion advice, styling tips, etc.),
-        mention that we have relevant products and suggest they ask about specific items like sunglasses, bags, or caps.
-        Keep your response friendly, concise (2-3 sentences max), and engaging.
+        
+        User message: "${userMessage}"
+        
+        Provide a helpful response (2-3 sentences max).
+        If related to products we sell, suggest specific categories.
+        Be friendly and engaging.
     `;
 
     const response = await callGeminiAPI(generalPrompt);
@@ -811,21 +793,36 @@ function addMessageToChat(text, className, save = true) {
     newMessage.className = `chatbot-message ${className}`;
     newMessage.textContent = className === 'user-message' ? `You: ${text}` : text;
     chatbotBody.appendChild(newMessage);
-    if (className !== 'product-recommendations') {
-        chatbotBody.scrollTop = chatbotBody.scrollHeight;
-    }
+    chatbotBody.scrollTop = chatbotBody.scrollHeight;
     return newMessage;
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-medium flex items-center ${
+        type === 'success' ? 'bg-green-500' : 'bg-red-500'
+    } animate-fade-in`;
+    toast.innerHTML = `
+        <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
+        ${message}
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.remove('animate-fade-in');
+        toast.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 async function showProductPopup(product) {
     const insightPrompt = `
-        You are an enthusiastic e-commerce assistant. Generate a short, exciting comment about the user's product choice.
-        Product: ${product.title}
-        Keep it positive and engaging, max 1 sentence.
-        Example: "Wow, you picked a stylish gem that's perfect for any occasion, ${JSON.parse(localStorage.getItem('user')).name}!"
+        Generate a short, exciting comment about this product:
+        ${product.title}
+        Keep it positive and engaging (max 1 sentence).
     `;
 
-    let insight = `Wow, you've chosen an amazing product, ${JSON.parse(localStorage.getItem('user')).name}!`;
+    let insight = "Great choice! This product looks amazing!";
     try {
         const insightResponse = await callGeminiAPI(insightPrompt);
         insight = insightResponse.trim();
@@ -848,209 +845,40 @@ function closePopup() {
     document.getElementById('popupOverlay').classList.remove('active');
 }
 
-async function renderCategoryButtons() {
-    const categoryButtons = document.getElementById('categoryButtons');
-    categoryButtons.innerHTML = '';
-
-    const categories = productFiles.map(file => ({
-        file,
-        name: file.replace('.json', '').replace('./', '').replace(/_/g, ' ')
-    }));
-
-    categories.forEach(category => {
-        const button = document.createElement('button');
-        button.className = 'category-button';
-        button.textContent = category.name;
-        button.onclick = () => renderProductsByCategory(category.file);
-        categoryButtons.appendChild(button);
-    });
-
-    const mixedButton = document.createElement('button');
-    mixedButton.className = 'category-button';
-    mixedButton.textContent = 'Mixed Products (100)';
-    mixedButton.onclick = renderMixedProducts;
-    categoryButtons.appendChild(mixedButton);
-
-    categoryButtons.style.transform = 'translateX(0px)';
-    document.querySelector('.category-nav-arrow.left').style.display = 'flex';
-    document.querySelector('.category-nav-arrow.right').style.display = 'flex';
-}
-
 async function updateCartItemCount() {
     let token = localStorage.getItem("token");
     let userId = JSON.parse(localStorage.getItem("user")).id;
     let cartItemsCount = document.getElementById("cartItemsCount");
     try {
-      const response = await fetch(`https://fitsedit.tooliso.com/cart/count?user_id=${userId}`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+        const response = await fetch(`https://fitsedit.tooliso.com/cart/count?user_id=${userId}`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
+            }
+        });
+        const data = await response.json();
+        if (response.ok) {
+            cartItemsCount.textContent = data.count || 0;
+        } else {
+            console.error("Failed to fetch cart count:", data.message);
+            cartItemsCount.textContent = "0";
         }
-      });
-      const data = await response.json();
-      console.log(data);
-      
-      if (response.ok) {
-        cartItemsCount.textContent = data.count || 0;
-      } else {
-        console.error("Failed to fetch cart count:", data.message);
+    } catch (error) {
+        console.error("Error fetching cart count:", error);
         cartItemsCount.textContent = "0";
-      }
-    } catch (error) {
-      console.error("Error fetching cart count:", error);
-      cartItemsCount.textContent = "0";
     }
 }
 
-function scrollCategories(direction) {
-    const categoryButtons = document.getElementById('categoryButtons');
-    const buttonWidth = categoryButtons.querySelector('.category-button')?.offsetWidth + 10 || 100;
-    const containerWidth = document.querySelector('.category-buttons-container').offsetWidth;
-    const maxScroll = (categoryButtons.children.length * buttonWidth) - containerWidth;
-
-    let currentScroll = 0;
-    const transform = categoryButtons.style.transform;
-    if (transform && transform.includes('translateX')) {
-        const match = transform.match(/translateX\(-?(\d*\.?\d*)px\)/);
-        currentScroll = match ? parseFloat(match[1]) : 0;
-    }
-
-    currentScroll += direction * buttonWidth * 3;
-    currentScroll = Math.max(0, Math.min(currentScroll, maxScroll));
-
-    categoryButtons.style.transform = `translateX(-${currentScroll}px)`;
-
-    document.querySelector('.category-nav-arrow.left').style.display = 'flex';
-    document.querySelector('.category-nav-arrow.right').style.display = 'flex';
+function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '../login.html';
 }
 
-async function renderProductsByCategory(file, limit = Infinity) {
-    const productGrid = document.getElementById('productGrid');
-    productGrid.innerHTML = '<p>Loading products...</p>';
-
-    try {
-        const products = allProductsCache[file];
-        productGrid.innerHTML = '';
-
-        const minPrice = 9;
-        const maxPrice = 100;
-
-        for (const product of products.slice(0, limit)) {
-            const priceGenerated = Math.floor(Math.random() * (maxPrice - minPrice + 1)) + minPrice;
-            if (product.price && typeof product.price === 'string' && product.price.includes('$')) {
-                product.price = parseFloat(product.price.replace('$', ''));
-            }
-            const price = product.price ? product.price : priceGenerated;
-            const formattedPrice = `$${parseFloat(price).toFixed(2)}`;
-
-            const productCard = document.createElement('div');
-            productCard.className = 'product-card';
-
-            const img = document.createElement('img');
-            img.src = product.imageUrl || 'https://via.placeholder.com/150';
-            img.alt = product.title || 'Product Image';
-            productCard.appendChild(img);
-
-            const title = document.createElement('p');
-            title.textContent = (product.title || 'Untitled Product').slice(0, 100);
-            productCard.appendChild(title);
-
-            const priceDiv = document.createElement('div');
-            priceDiv.className = 'price';
-            priceDiv.textContent = `Price: ${formattedPrice}`;
-            productCard.appendChild(priceDiv);
-
-            const button = document.createElement('button');
-            button.className = 'add-to-cart';
-            button.textContent = 'Add to Cart';
-            button.addEventListener('click', () => {
-                addToCart({
-                    imageUrl: product.imageUrl,
-                    title: product.title,
-                    price: price,
-                    id: product.asin,
-                    user_id: JSON.parse(localStorage.getItem('user')).id
-                });
-            });
-            productCard.appendChild(button);
-
-            productGrid.appendChild(productCard);
-        }
-    } catch (error) {
-        console.error('Error rendering products:', error);
-        productGrid.innerHTML = '<p>Failed to load products. Please try again later.</p>';
-    }
-}
-
-async function renderMixedProducts(limit = 100) {
-    const productGrid = document.getElementById('productGrid');
-    productGrid.innerHTML = '<p>Loading products...</p>';
-
-    try {
-        let allProducts = [];
-        for (const file in allProductsCache) {
-            allProducts = allProducts.concat(allProductsCache[file]);
-        }
-
-        for (let i = allProducts.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [allProducts[i], allProducts[j]] = [allProducts[j], allProducts[i]];
-        }
-
-        productGrid.innerHTML = '';
-
-        const minPrice = 9;
-        const maxPrice = 100;
-
-        for (const product of allProducts.slice(0, limit)) {
-            const priceGenerated = Math.floor(Math.random() * (maxPrice - minPrice + 1)) + minPrice;
-            if (product.price && typeof product.price === 'string' && product.price.includes('$')) {
-                product.price = parseFloat(product.price.replace('$', ''));
-            }
-            const price = product.price ? product.price : priceGenerated;
-            const formattedPrice = `$${parseFloat(price).toFixed(2)}`;
-
-            const productCard = document.createElement('div');
-            productCard.className = 'product-card';
-
-            const img = document.createElement('img');
-            img.src = product.imageUrl || 'https://via.placeholder.com/150';
-            img.alt = product.title || 'Product Image';
-            productCard.appendChild(img);
-
-            const title = document.createElement('p');
-            title.textContent = (product.title || 'Untitled Product').slice(0, 100);
-            productCard.appendChild(title);
-
-            const priceDiv = document.createElement('div');
-            priceDiv.className = 'price';
-            priceDiv.textContent = `Price: ${formattedPrice}`;
-            productCard.appendChild(priceDiv);
-
-            const button = document.createElement('button');
-            button.className = 'add-to-cart';
-            button.textContent = 'Add to Cart';
-            button.addEventListener('click', () => {
-                addToCart({
-                    imageUrl: product.imageUrl || 'https://via.placeholder.com/150',
-                    title: product.title || 'Untitled Product',
-                    price: price,
-                    id: product.asin,
-                    user_id: JSON.parse(localStorage.getItem('user'))?.id
-                });
-            });
-            productCard.appendChild(button);
-
-            productGrid.appendChild(productCard);
-        }
-    } catch (error) {
-        console.error('Error rendering mixed products:', error);
-        productGrid.innerHTML = '<p>Failed to load products. Please try again later.</p>';
-    }
-}
-
+// Initialize on DOM load
 document.addEventListener('DOMContentLoaded', async function () {
+    // Preload product files
     await Promise.all(productFiles.map(async file => {
         try {
             const response = await fetch(file);
@@ -1060,19 +888,17 @@ document.addEventListener('DOMContentLoaded', async function () {
             console.error(`Error preloading ${file}:`, error);
         }
     }));
+    
+    // Load initial cart data
+    await getCartItems();
     updateCartItemCount();
-    renderCategoryButtons();
-    renderMixedProducts();
+    
+    // Set up popup close handler
     document.getElementById('popupOverlay').addEventListener('click', closePopup);
+    
+    // Check authentication
+    let token = localStorage.getItem("token");
+    if (!token) {
+        window.location.href = "../login.html";
+    }
 });
-
-function logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '../login.html';
-}
-
-let token = localStorage.getItem("token");
-if (!token) {
-    window.location.href = "../login.html";
-}
