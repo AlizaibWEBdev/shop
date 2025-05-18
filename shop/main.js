@@ -891,7 +891,7 @@ async function updateCartItemCount() {
       const data = await response.json();
       console.log(data);
       
-      if (response.ok) {
+      if (data.success == true) {
         cartItemsCount.textContent = data.count || 0;
       } else {
         console.error("Failed to fetch cart count:", data.message);
