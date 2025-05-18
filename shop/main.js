@@ -546,7 +546,6 @@ async function sendMessageCommon() {
             3. If the message explicitly mentions a new category (e.g., "glasses", "bags"), prioritize that category over the previous one, even if it's a follow-up.
             4. Only assume it's a follow-up referring to the last category for vague queries like "show me more," "more," or "show."
             5. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
-            6.if user asking for avaibale prodcuts or avaliable catogory you can show him/her from this list 
             Product files available:
             - beanies caps for men women
             - branded hand women bags
@@ -611,7 +610,6 @@ async function sendMessageCommon() {
                 await handleProductQuery(message, fileAnalysis.relevantFile);
             }
         } else if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile === "none") {
-            // Handle unavailable categories like undergarments
             const responseText = `${JSON.parse(localStorage.getItem('user')).name}, I’m sorry, but we don’t have that category in our collection. You can check out items like sunglasses, bags, or caps instead—would you like to see those?`;
             addMessageToChat(responseText, 'bot-message');
             saveChatHistory({
@@ -673,38 +671,53 @@ async function handleProductQuery(userMessage, relevantFile) {
 
 async function displayPendingProducts(userMessage, relevantFile) {
     relevantFile = relevantFile.includes('.json') ? relevantFile : relevantFile + '.json';
-    const products = allProductsCache[relevantFile];
+    let products = allProductsCache[relevantFile];
     const chatContext = getChatContext();
     queryContext = loadQueryContext();
     const priceThreshold = chatContext.includes('more then 10$') ? 10 : 0;
+    const isCheapestRequest = userMessage.toLowerCase().includes('cheapest');
+
+    // Normalize prices and sort if looking for the cheapest
+    products = products.map(product => {
+        let price = product.price;
+        if (typeof price === 'string') {
+            price = parseFloat(price.replace('$', '')) || 0;
+        }
+        return { ...product, price };
+    });
+
+    if (isCheapestRequest) {
+        products.sort((a, b) => a.price - b.price);
+    }
 
     const productPrompt = `
         You are an e-commerce assistant named Alex helping a customer find products.
         Here is the conversation history for context:
         ${chatContext}
-        Here are products from our "${relevantFile.replace('.json', '').replace('./', '')}" collection:
+        Here are products from our "${relevantFile.replace('.json', '').replace('./', '')}" collection, sorted by price if requested:
         ${JSON.stringify(products, null, 2)}
         The user asked: "${userMessage}"
         Previously shown product IDs: ${JSON.stringify(queryContext.shownProductIds || [])}
         Please:
         1. Select up to 5 relevant products that match the user's request, excluding previously shown products (based on product IDs if available, or titles otherwise).
-        2. Filter products with a price greater than ${priceThreshold} if specified, otherwise show a mix of prices.
-        3. Consider price, features, user's implied needs (e.g., caps, bags, sunglasses), and conversation history.
-        4. If the user mentioned caps, prioritize baseball caps, beanies, or sun hats.
-        5. If the user mentioned bags, prioritize handbags or similar accessories.
-        6. If the user mentioned sunglasses and specified styles like aviators or wayfarers, prioritize those.
-        7. For follow-up requests like "show me more," select new products not previously shown.
-        8. If no products match or an error occurs, provide a fallback message suggesting alternative categories.
-        9. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
+        2. If the user asked for the "cheapest" item, prioritize the lowest-priced products.
+        3. Filter products with a price greater than ${priceThreshold} if specified, otherwise show a mix of prices.
+        4. Consider price, features, user's implied needs (e.g., caps, bags, sunglasses), and conversation history.
+        5. If the user mentioned caps, prioritize baseball caps, beanies, or sun hats.
+        6. If the user mentioned bags, prioritize handbags or similar accessories.
+        7. If the user mentioned sunglasses and specified styles like aviators or wayfarers, prioritize those.
+        8. For follow-up requests like "show me more," select new products not previously shown.
+        9. If no products match or an error occurs, provide a fallback message suggesting alternative categories.
+        10. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
         Return your response in this exact JSON format:
         {
-            "responseText": "Your friendly response to the user explaining the recommendations, referencing past conversation if relevant (e.g., 'You asked for sunglasses, here are five more stylish options, ${JSON.parse(localStorage.getItem('user')).name}!').",
+            "responseText": "Your friendly response to the user explaining the recommendations, referencing past conversation if relevant (e.g., 'You asked for the cheapest jacket, ${JSON.parse(localStorage.getItem('user')).name}, here’s the most affordable one I found!').",
             "products": [
                 {
                     "id": "asin -> product ID",
                     "title": "Product name",
                     "description": "Brief description",
-                    "price": "Price",
+                    "price": "Price with $",
                     "imageUrl": "Image URL",
                     "reason": "Why this matches the user's needs"
                 }
@@ -826,22 +839,6 @@ async function handleGeneralQuery(userMessage) {
     const chatContext = getChatContext();
     const generalPrompt = `
         You are a helpful assistant for an e-commerce website that sells clothing and accessories.
-        if you want you can use this 
-        available products 
-            - beanies caps for men women
-            - branded hand women bags
-            - Formal Dresses_men
-            - Formal Dresses_women
-            - high end shoes for men
-            - high end shoes for women
-            - lather jackets men
-            - lather jackets women
-            - socks for men
-            - socks for women
-            - sunglasses mens
-            - sunglasses womens
-            - tshirts shirts for men
-            - tshirts shirts for women
         The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
         Here is the conversation history for context:
         ${chatContext}
@@ -977,8 +974,8 @@ async function updateCartItemCount() {
         cartItemsCount.textContent = "0";
       }
     } catch (error) {
-      console.error("Error fetching cart count:", error);
-      cartItemsCount.textContent = "0";
+        console.error("Error fetching cart count:", error);
+        cartItemsCount.textContent = "0";
     }
 }
 
