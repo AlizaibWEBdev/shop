@@ -625,6 +625,21 @@ async function displayPendingProducts(userMessage, relevantFile) {
         The user asked: "${userMessage}"
         Previously shown product IDs: ${JSON.stringify(queryContext.shownProductIds || [])}
         Please:
+        here are the available prodcuts that we have 
+         - beanies caps for men women
+            - branded hand women bags
+            - Formal Dresses_men
+            - Formal Dresses_women
+            - high end shoes for men
+            - high end shoes for women
+            - lather jackets men
+            - lather jackets women
+            - socks for men
+            - socks for women
+            - sunglasses mens
+            - sunglasses womens
+            - tshirts shirts for men
+            - tshirts shirts for women
         1. Select up to 5 relevant products that match the user's request, excluding previously shown products (based on product IDs if available, or titles otherwise).
         2. Filter products with a price greater than ${priceThreshold} if specified, otherwise show a mix of prices.
         3. Consider price, features, user's implied needs (e.g., caps, bags, sunglasses), and conversation history.
@@ -763,9 +778,27 @@ async function displayPendingProducts(userMessage, relevantFile) {
 async function handleGeneralQuery(userMessage) {
     const chatContext = getChatContext();
     const generalPrompt = `
+
         You are a helpful assistant for an e-commerce website that sells clothing and accessories.
         The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
         Here is the conversation history for context:
+             here are the available prodcuts that we have 
+         - beanies caps for men women
+            - branded hand women bags
+            - Formal Dresses_men
+            - Formal Dresses_women
+            - high end shoes for men
+            - high end shoes for women
+            - lather jackets men
+            - lather jackets women
+            - socks for men
+            - socks for women
+            - sunglasses mens
+            - sunglasses womens
+            - tshirts shirts for men
+            - tshirts shirts for women
+
+            
         ${chatContext}
         The user asked: "${userMessage}"
         Please provide a helpful response, referencing past conversation if relevant (e.g., 'You were looking for sunglasses, would you like to see more, ${JSON.parse(localStorage.getItem('user')).name}?').
