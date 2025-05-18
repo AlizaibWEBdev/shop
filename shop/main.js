@@ -1,7 +1,7 @@
 let allProductsCache = {};
 let queryContext = {};
 const API_KEY = "AIzaSyDHbhK8_EZRJ_Br6MsviB2Pu6BuE6KctVg";
-const MAX_CHAT_HISTORY = 10;
+const MAX_CHAT_HISTORY = 50;
 
 const productFiles = [
     "./beanies caps for men women.json",
