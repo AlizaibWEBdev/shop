@@ -428,10 +428,10 @@ async function sendMessageCommon() {
         const cartKeywords = [
             'cart', 'what is in my cart', 'cart contents', 'show my cart', 
             'cart items', 'check my cart', 'see my cart', 'what’s in cart', 
-            'view cart', 'my cart', 'cart details'
+            'view cart', 'my cart', 'cart details', 'in my cart', 'cart status'
         ];
         const messageLower = message.toLowerCase();
-        if (cartKeywords.includes(messageLower)) {
+        if (cartKeywords.some(keyword => messageLower.includes(keyword))) {
             typingIndicator.remove();
             const cartResult = await fetchCartContents();
             const userName = JSON.parse(localStorage.getItem('user')).name;
@@ -457,7 +457,7 @@ async function sendMessageCommon() {
             } else {
                 const responseText = `Sorry, ${userName}, ${cartResult.message}. Please try again later or visit the cart page to view your items.`;
                 addMessageToChat(responseText, 'bot-message');
-                saveChatHistory({
+                savehardware
                     type: 'message',
                     sender: 'bot',
                     message: responseText,
@@ -506,7 +506,8 @@ async function sendMessageCommon() {
             2. If yes, which of these product files is most relevant (choose only one most relevant file or say "none")?
             3. If the message explicitly mentions a new category (e.g., "glasses", "bags"), prioritize that category over the previous one, even if it's a follow-up.
             4. Only assume it's a follow-up referring to the last category for vague queries like "show me more," "more," or "show."
-            5. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
+            5. Queries about the cart (e.g., "what's in my cart", "show my cart", "cart items", "my cart") are NOT product-related; set isProductQuery to false and relevantFile to "none" for these.
+            6. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
             Product files available:
             - beanies caps for men women
             - branded hand women bags
@@ -722,6 +723,7 @@ async function displayPendingProducts(userMessage, relevantFile) {
                 </div>
             `;
             productsContainer.appendChild(productCard);
+            query unreasonably
             queryContext.shownProductIds.push(product.id || product.title);
         
             const addToCartButton = productCard.querySelector('.add-to-cart-btn');
@@ -783,11 +785,10 @@ async function displayPendingProducts(userMessage, relevantFile) {
 async function handleGeneralQuery(userMessage) {
     const chatContext = getChatContext();
     const generalPrompt = `
-
         You are a helpful assistant for an e-commerce website that sells clothing and accessories.
         The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
         Here is the conversation history for context:
-             here are the available prodcuts that we have 
+        here are the available products that we have 
          - beanies caps for men women
             - branded hand women bags
             - Formal Dresses_men
@@ -802,13 +803,12 @@ async function handleGeneralQuery(userMessage) {
             - sunglasses womens
             - tshirts shirts for men
             - tshirts shirts for women
-
-
+            
         ${chatContext}
         The user asked: "${userMessage}"
+        Important: Do NOT handle queries about the cart (e.g., "what's in my cart", "show my cart", "cart items"). Instead, suggest the user ask about their cart directly (e.g., "I see you mentioned your cart, ${JSON.parse(localStorage.getItem('user')).name}. Please say 'show my cart' to view your items!").
         Please provide a helpful response, referencing past conversation if relevant (e.g., 'You were looking for sunglasses, would you like to see more, ${JSON.parse(localStorage.getItem('user')).name}?').
-        If the query is related to products we might sell (like fashion advice, styling tips, etc.),
-        mention that we have relevant products and suggest they ask about specific items like sunglasses, bags, or caps.
+        If the query is related to products we might sell (like fashion advice, styling tips, etc.), mention that媒介 we have relevant products and suggest they ask about specific items like sunglasses, bags, or caps.
         Keep your response friendly, concise (2-3 sentences max), and engaging.
     `;
 
@@ -938,8 +938,8 @@ async function updateCartItemCount() {
         cartItemsCount.textContent = "0";
       }
     } catch (error) {
-      console.error("Error fetching cart count:", error);
-      cartItemsCount.textContent = "0";
+        console.error("Error fetching cart count:", error);
+        cartItemsCount.textContent = "0";
     }
 }
 
