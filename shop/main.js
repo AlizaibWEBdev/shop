@@ -20,36 +20,28 @@ const productFiles = [
     "./tshirts shirts for women.json"
 ];
 
-// Clear chat history and context if user ID changes
-function checkAndClearChatOnLogin() {
-    const currentUser = JSON.parse(localStorage.getItem('user'));
-    const previousUserId = localStorage.getItem('previousUserId');
-
-    if (currentUser && previousUserId && currentUser.id !== previousUserId) {
-        localStorage.removeItem('chatHistory');
-        localStorage.removeItem('queryContext');
-        localStorage.setItem('previousUserId', currentUser.id);
-    } else if (currentUser && !previousUserId) {
-        localStorage.setItem('previousUserId', currentUser.id);
-    }
-}
-
 function loadChatHistory() {
-    const history = localStorage.getItem('chatHistory');
+    const userId = JSON.parse(localStorage.getItem('user'))?.id;
+    const historyKey = `chatHistory_${userId || 'default'}`;
+    const history = localStorage.getItem(historyKey);
     return history ? JSON.parse(history) : [];
 }
 
 function saveChatHistory(entry) {
+    const userId = JSON.parse(localStorage.getItem('user'))?.id;
+    const historyKey = `chatHistory_${userId || 'default'}`;
     let history = loadChatHistory();
     history.push(entry);
     if (history.length > MAX_CHAT_HISTORY) {
         history = history.slice(-MAX_CHAT_HISTORY);
     }
-    localStorage.setItem('chatHistory', JSON.stringify(history));
+    localStorage.setItem(historyKey, JSON.stringify(history));
 }
 
 function loadQueryContext() {
-    const context = localStorage.getItem('queryContext');
+    const userId = JSON.parse(localStorage.getItem('user'))?.id;
+    const contextKey = `queryContext_${userId || 'default'}`;
+    const context = localStorage.getItem(contextKey);
     return context ? JSON.parse(context) : {
         category: null,
         shownProductIds: [],
@@ -63,7 +55,9 @@ function loadQueryContext() {
 }
 
 function saveQueryContext(context) {
-    localStorage.setItem('queryContext', JSON.stringify(context));
+    const userId = JSON.parse(localStorage.getItem('user'))?.id;
+    const contextKey = `queryContext_${userId || 'default'}`;
+    localStorage.setItem(contextKey, JSON.stringify(context));
 }
 
 async function addToCart(product) {
@@ -337,7 +331,7 @@ async function handleProductDetailQuery(userMessage, relevantFile, productTitle)
 
 async function sendMessageCommon() {
     const input = document.getElementById('chatbotInput');
-    const message = input.value.trim();
+    const message = input.value.trim().toLowerCase();
 
     if (!message) return;
 
@@ -355,7 +349,6 @@ async function sendMessageCommon() {
     try {
         queryContext = loadQueryContext();
 
-        // Handle tracking ID input
         if (queryContext.awaitingTrackingId) {
             typingIndicator.remove();
             queryContext.awaitingTrackingId = false;
@@ -393,15 +386,9 @@ async function sendMessageCommon() {
             return;
         }
 
-        // Skip confirmation for clear "show me" requests
-        const showKeywords = ['show me', 'display', 'view', 'see'];
-        const isDirectShowRequest = showKeywords.some(keyword => message.toLowerCase().includes(keyword));
-
-        // Handle confirmation responses
-        if (queryContext.awaitingConfirmation && !isDirectShowRequest) {
+        if (queryContext.awaitingConfirmation) {
             const affirmativeResponses = ['yes', 'sure', 'okay', 'yep', 'show', 'please', 'yha', 'yeah', 'ok', 'yup'];
-            const messageLower = message.toLowerCase();
-            if (affirmativeResponses.some(word => messageLower.includes(word))) {
+            if (affirmativeResponses.some(word => message.includes(word))) {
                 typingIndicator.remove();
                 const acknowledgment = `Got it, let me find those ${queryContext.category.replace('.json', '').replace('./', '')} for you!`;
                 addMessageToChat(acknowledgment, 'bot-message');
@@ -438,8 +425,7 @@ async function sendMessageCommon() {
             }
         }
 
-        // Check for product detail query
-        if (queryContext.lastShownCategory && message.toLowerCase().includes('material')) {
+        if (queryContext.lastShownCategory && message.includes('material')) {
             typingIndicator.remove();
             const productTitle = queryContext.lastQuery || message;
             const detailResponse = await handleProductDetailQuery(message, queryContext.lastShownCategory, productTitle);
@@ -453,9 +439,8 @@ async function sendMessageCommon() {
             return;
         }
 
-        // Check for order tracking query
         const trackingKeywords = ['track', 'order status', 'where is my order', 'order tracking', 'delivery status'];
-        if (trackingKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
+        if (trackingKeywords.some(keyword => message.includes(keyword))) {
             typingIndicator.remove();
             queryContext.awaitingTrackingId = true;
             saveQueryContext(queryContext);
@@ -470,9 +455,8 @@ async function sendMessageCommon() {
             return;
         }
 
-        // Check for cart content query
         const cartKeywords = ["what's in my cart", 'cart contents', 'show my cart', 'cart items', 'check my cart', 'see my cart'];
-        if (cartKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
+        if (cartKeywords.some(keyword => message.includes(keyword))) {
             typingIndicator.remove();
             const cartResult = await fetchCartContents();
             const userName = JSON.parse(localStorage.getItem('user')).name;
@@ -508,42 +492,12 @@ async function sendMessageCommon() {
             return;
         }
 
-        // Check for delivery cost query
-        const deliveryKeywords = ['delivery cost', 'shipping cost', 'delivery fee', 'shipping fee'];
-        if (deliveryKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
-            typingIndicator.remove();
-            const responseText = `${JSON.parse(localStorage.getItem('user')).name}, delivery costs vary based on your location and order total. You can see the exact amount at checkout, or I can help you explore our products first!`;
-            addMessageToChat(responseText, 'bot-message');
-            saveChatHistory({
-                type: 'message',
-                sender: 'bot',
-                message: responseText,
-                timestamp: new Date().toISOString()
-            });
-            return;
-        }
-
-        // Check for listing categories
-        if (message.toLowerCase().includes('list') && message.toLowerCase().includes('categories')) {
-            typingIndicator.remove();
-            const categories = productFiles.map(file => file.replace('.json', '').replace('./', '').replace(/_/g, ' ')).join(', ');
-            const responseText = `${JSON.parse(localStorage.getItem('user')).name}, here are all the product categories we have: ${categories}. Which one would you like to explore?`;
-            addMessageToChat(responseText, 'bot-message');
-            saveChatHistory({
-                type: 'message',
-                sender: 'bot',
-                message: responseText,
-                timestamp: new Date().toISOString()
-            });
-            return;
-        }
-
         const fileAnalysisPrompt = `
             You are an assistant for an e-commerce website.
             Analyze the user's message and determine:
             1. Is this a product-related query (yes/no)?
             2. If yes, which of these product files is most relevant (choose only one most relevant file or say "none")?
-            3. If the message explicitly mentions a new category (e.g., "glasses", "bags"), prioritize that category over the previous one, even if it's a follow-up.
+            3. If the message explicitly mentions a new category (e.g., "glasses", "bags", "undergarments"), prioritize that category over the previous one, even if it's a follow-up.
             4. Only assume it's a follow-up referring to the last category for vague queries like "show me more," "more," or "show."
             5. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
             Product files available:
@@ -587,37 +541,14 @@ async function sendMessageCommon() {
 
         typingIndicator.remove();
 
-        // Reset category if new product query with different category
-        if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile !== "none" && fileAnalysis.relevantFile !== queryContext.category) {
-            queryContext.category = fileAnalysis.relevantFile;
-            queryContext.shownProductIds = [];
-        }
-
-        if (fileAnalysis.isFollowUp && queryContext.category) {
-            fileAnalysis.isProductQuery = true;
-            fileAnalysis.relevantFile = queryContext.category;
-        }
-
         if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile !== "none") {
             queryContext.lastQuery = message;
             saveQueryContext(queryContext);
-            if (isDirectShowRequest) {
-                await simulateThinking();
-                const thinkingIndicator = addMessageToChat('Searching for the best options...', 'typing-indicator');
-                await displayPendingProducts(message, fileAnalysis.relevantFile);
-                thinkingIndicator.remove();
+            if (message.includes("show me") || message.includes("best")) {
+                await handleProductQueryDirect(message, fileAnalysis.relevantFile);
             } else {
                 await handleProductQuery(message, fileAnalysis.relevantFile);
             }
-        } else if (fileAnalysis.isProductQuery && fileAnalysis.relevantFile === "none") {
-            const responseText = `${JSON.parse(localStorage.getItem('user')).name}, I’m sorry, but we don’t have that category in our collection. You can check out items like sunglasses, bags, or caps instead—would you like to see those?`;
-            addMessageToChat(responseText, 'bot-message');
-            saveChatHistory({
-                type: 'message',
-                sender: 'bot',
-                message: responseText,
-                timestamp: new Date().toISOString()
-            });
         } else {
             await handleGeneralQuery(message);
         }
@@ -669,55 +600,67 @@ async function handleProductQuery(userMessage, relevantFile) {
     saveQueryContext(queryContext);
 }
 
+async function handleProductQueryDirect(userMessage, relevantFile) {
+    relevantFile = relevantFile.includes('.json') ? relevantFile : relevantFile + '.json';
+    if (!allProductsCache[relevantFile]) {
+        try {
+            const response = await fetch(relevantFile);
+            if (!response.ok) throw new Error(`Failed to fetch ${relevantFile}`);
+            allProductsCache[relevantFile] = await response.json();
+        } catch (error) {
+            console.error('Error fetching product file:', error);
+            addMessageToChat('Sorry, I couldn\'t access the product information. Please try again later.', 'bot-message');
+            saveChatHistory({
+                type: 'message',
+                sender: 'bot',
+                message: 'Sorry, I couldn\'t access the product information. Please try again later.',
+                timestamp: new Date().toISOString()
+            });
+            return;
+        }
+    }
+
+    await simulateThinking();
+    const thinkingIndicator = addMessageToChat('Searching for the best options...', 'typing-indicator');
+    await displayPendingProducts(userMessage, relevantFile);
+    thinkingIndicator.remove();
+}
+
 async function displayPendingProducts(userMessage, relevantFile) {
     relevantFile = relevantFile.includes('.json') ? relevantFile : relevantFile + '.json';
-    let products = allProductsCache[relevantFile];
+    const products = allProductsCache[relevantFile];
     const chatContext = getChatContext();
     queryContext = loadQueryContext();
     const priceThreshold = chatContext.includes('more then 10$') ? 10 : 0;
-    const isCheapestRequest = userMessage.toLowerCase().includes('cheapest');
-
-    // Normalize prices and sort if looking for the cheapest
-    products = products.map(product => {
-        let price = product.price;
-        if (typeof price === 'string') {
-            price = parseFloat(price.replace('$', '')) || 0;
-        }
-        return { ...product, price };
-    });
-
-    if (isCheapestRequest) {
-        products.sort((a, b) => a.price - b.price);
-    }
 
     const productPrompt = `
         You are an e-commerce assistant named Alex helping a customer find products.
         Here is the conversation history for context:
         ${chatContext}
-        Here are products from our "${relevantFile.replace('.json', '').replace('./', '')}" collection, sorted by price if requested:
+        Here are products from our "${relevantFile.replace('.json', '').replace('./', '')}" collection:
         ${JSON.stringify(products, null, 2)}
         The user asked: "${userMessage}"
         Previously shown product IDs: ${JSON.stringify(queryContext.shownProductIds || [])}
         Please:
         1. Select up to 5 relevant products that match the user's request, excluding previously shown products (based on product IDs if available, or titles otherwise).
-        2. If the user asked for the "cheapest" item, prioritize the lowest-priced products.
-        3. Filter products with a price greater than ${priceThreshold} if specified, otherwise show a mix of prices.
-        4. Consider price, features, user's implied needs (e.g., caps, bags, sunglasses), and conversation history.
-        5. If the user mentioned caps, prioritize baseball caps, beanies, or sun hats.
-        6. If the user mentioned bags, prioritize handbags or similar accessories.
-        7. If the user mentioned sunglasses and specified styles like aviators or wayfarers, prioritize those.
-        8. For follow-up requests like "show me more," select new products not previously shown.
-        9. If no products match or an error occurs, provide a fallback message suggesting alternative categories.
+        2. Filter products with a price greater than ${priceThreshold} if specified, otherwise show a mix of prices.
+        3. Consider price, features, user's implied needs (e.g., caps, bags, sunglasses), and conversation history.
+        4. If the user mentioned caps, prioritize baseball caps, beanies, or sun hats.
+        5. If the user mentioned bags, prioritize handbags or similar accessories.
+        6. If the user mentioned sunglasses and specified styles like aviators or wayfarers, prioritize those.
+        7. For follow-up requests like "show me more," select new products not previously shown.
+        8. If no products match or an error occurs, provide a fallback message suggesting alternative categories.
+        9. If the user asked about undergarments and no relevant products exist, respond that we don’t carry them and suggest alternatives like socks or shirts.
         10. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
         Return your response in this exact JSON format:
         {
-            "responseText": "Your friendly response to the user explaining the recommendations, referencing past conversation if relevant (e.g., 'You asked for the cheapest jacket, ${JSON.parse(localStorage.getItem('user')).name}, here’s the most affordable one I found!').",
+            "responseText": "Your friendly response to the user explaining the recommendations, referencing past conversation if relevant (e.g., 'You asked for sunglasses, here are five more stylish options, ${JSON.parse(localStorage.getItem('user')).name}!').",
             "products": [
                 {
                     "id": "asin -> product ID",
                     "title": "Product name",
                     "description": "Brief description",
-                    "price": "Price with $",
+                    "price": "Price",
                     "imageUrl": "Image URL",
                     "reason": "Why this matches the user's needs"
                 }
@@ -732,11 +675,11 @@ async function displayPendingProducts(userMessage, relevantFile) {
         const responseData = JSON.parse(productResponse.slice(jsonStart, jsonEnd));
 
         if (!responseData.products || responseData.products.length === 0) {
-            addMessageToChat('I couldn’t find more products matching your request. Would you like to see items from another category, like bags or caps?', 'bot-message');
+            addMessageToChat(responseData.responseText, 'bot-message');
             saveChatHistory({
                 type: 'message',
                 sender: 'bot',
-                message: 'I couldn’t find more products matching your request. Would you like to see items from another category, like bags or caps?',
+                message: responseData.responseText,
                 timestamp: new Date().toISOString()
             });
             return;
@@ -846,6 +789,7 @@ async function handleGeneralQuery(userMessage) {
         Please provide a helpful response, referencing past conversation if relevant (e.g., 'You were looking for sunglasses, would you like to see more, ${JSON.parse(localStorage.getItem('user')).name}?').
         If the query is related to products we might sell (like fashion advice, styling tips, etc.),
         mention that we have relevant products and suggest they ask about specific items like sunglasses, bags, or caps.
+        If the user asks about undergarments, clarify we don’t carry them and suggest alternatives like socks or shirts.
         Keep your response friendly, concise (2-3 sentences max), and engaging.
     `;
 
@@ -974,8 +918,8 @@ async function updateCartItemCount() {
         cartItemsCount.textContent = "0";
       }
     } catch (error) {
-        console.error("Error fetching cart count:", error);
-        cartItemsCount.textContent = "0";
+      console.error("Error fetching cart count:", error);
+      cartItemsCount.textContent = "0";
     }
 }
 
@@ -1127,7 +1071,14 @@ async function renderMixedProducts(limit = 100) {
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
-    checkAndClearChatOnLogin();
+    const userId = JSON.parse(localStorage.getItem('user'))?.id;
+    if (userId) {
+        const oldHistoryKey = `chatHistory_${userId === JSON.parse(localStorage.getItem('user'))?.id ? 'default' : userId}`;
+        localStorage.removeItem(oldHistoryKey);
+        const oldContextKey = `queryContext_${userId === JSON.parse(localStorage.getItem('user'))?.id ? 'default' : userId}`;
+        localStorage.removeItem(oldContextKey);
+    }
+
     await Promise.all(productFiles.map(async file => {
         try {
             const response = await fetch(file);
@@ -1146,7 +1097,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    localStorage.removeItem('previousUserId');
     window.location.href = '../login.html';
 }
 
