@@ -880,6 +880,7 @@ async function updateCartItemCount() {
     let token = localStorage.getItem("token");
     let userId = JSON.parse(localStorage.getItem("user")).id;
     let cartItemsCount = document.getElementById("cartItemsCount");
+    let cartItemsCount2 = document.getElementById("cartItemsCountDesktop");
     try {
       const response = await fetch(`https://fitsedit.tooliso.com/cart/count?user_id=${userId}`, {
         method: "GET",
@@ -893,6 +894,7 @@ async function updateCartItemCount() {
       
       if (data.success == true) {
         cartItemsCount.textContent = data.count || 0;
+        cartItemsCount2.textContent = data.count || 0;
       } else {
         console.error("Failed to fetch cart count:", data.message);
         cartItemsCount.textContent = "0";
