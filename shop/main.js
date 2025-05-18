@@ -546,6 +546,7 @@ async function sendMessageCommon() {
             3. If the message explicitly mentions a new category (e.g., "glasses", "bags"), prioritize that category over the previous one, even if it's a follow-up.
             4. Only assume it's a follow-up referring to the last category for vague queries like "show me more," "more," or "show."
             5. The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
+            6.if user asking for avaibale prodcuts or avaliable catogory you can show him/her from this list 
             Product files available:
             - beanies caps for men women
             - branded hand women bags
@@ -825,6 +826,22 @@ async function handleGeneralQuery(userMessage) {
     const chatContext = getChatContext();
     const generalPrompt = `
         You are a helpful assistant for an e-commerce website that sells clothing and accessories.
+        if you want you can use this 
+        available products 
+            - beanies caps for men women
+            - branded hand women bags
+            - Formal Dresses_men
+            - Formal Dresses_women
+            - high end shoes for men
+            - high end shoes for women
+            - lather jackets men
+            - lather jackets women
+            - socks for men
+            - socks for women
+            - sunglasses mens
+            - sunglasses womens
+            - tshirts shirts for men
+            - tshirts shirts for women
         The user who is talking with you is named ${JSON.parse(localStorage.getItem('user')).name}; use this name in your response and avoid gender-specific terms like "sir" or "ma'am".
         Here is the conversation history for context:
         ${chatContext}
