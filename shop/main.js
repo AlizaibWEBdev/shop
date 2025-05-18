@@ -424,41 +424,14 @@ async function sendMessageCommon() {
             }
         }
 
-        // Check for product detail query
-        if (queryContext.lastShownCategory && message.toLowerCase().includes('material')) {
-            typingIndicator.remove();
-            const productTitle = queryContext.lastQuery || message;
-            const detailResponse = await handleProductDetailQuery(message, queryContext.lastShownCategory, productTitle);
-            addMessageToChat(detailResponse.responseText, 'bot-message');
-            saveChatHistory({
-                type: 'message',
-                sender: 'bot',
-                message: detailResponse.responseText,
-                timestamp: new Date().toISOString()
-            });
-            return;
-        }
-
-        // Check for order tracking query
-        const trackingKeywords = ['track', 'order status', 'where is my order', 'order tracking', 'delivery status'];
-        if (trackingKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
-            typingIndicator.remove();
-            queryContext.awaitingTrackingId = true;
-            saveQueryContext(queryContext);
-            const responseText = `Please provide your tracking ID, ${JSON.parse(localStorage.getItem('user')).name}, and I'll check the status of your order.`;
-            addMessageToChat(responseText, 'bot-message');
-            saveChatHistory({
-                type: 'message',
-                sender: 'bot',
-                message: responseText,
-                timestamp: new Date().toISOString()
-            });
-            return;
-        }
-
-        // Check for cart content query
-        const cartKeywords = ["what's in my cart", 'cart contents', 'show my cart', 'cart items', 'check my cart', 'see my cart'];
-        if (cartKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
+        // Check for cart content query with broader keyword matching
+        const cartKeywords = [
+            'cart', 'what is in my cart', 'cart contents', 'show my cart', 
+            'cart items', 'check my cart', 'see my cart', 'what’s in cart', 
+            'view cart', 'my cart', 'cart details'
+        ];
+        const messageLower = message.toLowerCase();
+        if (cartKeywords.some(keyword => messageLower.includes(keyword))) {
             typingIndicator.remove();
             const cartResult = await fetchCartContents();
             const userName = JSON.parse(localStorage.getItem('user')).name;
@@ -491,6 +464,38 @@ async function sendMessageCommon() {
                     timestamp: new Date().toISOString()
                 });
             }
+            return;
+        }
+
+        // Check for product detail query
+        if (queryContext.lastShownCategory && messageLower.includes('material')) {
+            typingIndicator.remove();
+            const productTitle = queryContext.lastQuery || message;
+            const detailResponse = await handleProductDetailQuery(message, queryContext.lastShownCategory, productTitle);
+            addMessageToChat(detailResponse.responseText, 'bot-message');
+            saveChatHistory({
+                type: 'message',
+                sender: 'bot',
+                message: detailResponse.responseText,
+                timestamp: new Date().toISOString()
+            });
+            return;
+        }
+
+        // Check for order tracking query
+        const trackingKeywords = ['track', 'order status', 'where is my order', 'order tracking', 'delivery status'];
+        if (trackingKeywords.some(keyword => messageLower.includes(keyword))) {
+            typingIndicator.remove();
+            queryContext.awaitingTrackingId = true;
+            saveQueryContext(queryContext);
+            const responseText = `Please provide your tracking ID, ${JSON.parse(localStorage.getItem('user')).name}, and I'll check the status of your order.`;
+            addMessageToChat(responseText, 'bot-message');
+            saveChatHistory({
+                type: 'message',
+                sender: 'bot',
+                message: responseText,
+                timestamp: new Date().toISOString()
+            });
             return;
         }
 
@@ -798,7 +803,7 @@ async function handleGeneralQuery(userMessage) {
             - tshirts shirts for men
             - tshirts shirts for women
 
-            
+
         ${chatContext}
         The user asked: "${userMessage}"
         Please provide a helpful response, referencing past conversation if relevant (e.g., 'You were looking for sunglasses, would you like to see more, ${JSON.parse(localStorage.getItem('user')).name}?').
