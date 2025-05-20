@@ -736,16 +736,12 @@ async function renderCategoryButtons() {
     categories.forEach(category => {
         const button = document.createElement('button');
         button.className = 'category-button';
-        button.textContent = category.name.toLocaleLowerCase().replace("mens","men").replace("womens","women");
+        button.textContent = category.name.toLocaleLowerCase().replace("mens","men").replace("womens","women").replace("lather","leather");
         button.onclick = () => renderProductsByCategory(category.file);
         categoryButtons.appendChild(button);
     });
 
-    const mixedButton = document.createElement('button');
-    mixedButton.className = 'category-button';
-    mixedButton.textContent = 'Mixed Products (100)';
-    mixedButton.onclick = renderMixedProducts;
-    categoryButtons.appendChild(mixedButton);
+ 
 
     categoryButtons.style.transform = 'translateX(0px)';
     document.querySelector('.category-nav-arrow.left').style.display = 'flex';
