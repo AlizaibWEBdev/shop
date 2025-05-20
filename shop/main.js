@@ -730,13 +730,13 @@ async function renderCategoryButtons() {
 
     const categories = productFiles.map(file => ({
         file,
-        name: file.replace('.json', '').replace('./', '').replace(/_/g, ' ')
+        name: file.toLocaleLowerCase().replace('.json', '').replace('./', '').replace(/_/g, ' ').replace("mens","men").replace("womens","women").replace("lather","leather")
     }));
 
     categories.forEach(category => {
         const button = document.createElement('button');
         button.className = 'category-button';
-        button.textContent = category.name.toLocaleLowerCase().replace("mens","men").replace("womens","women").replace("lather","leather");
+        button.textContent = category.name
         button.onclick = () => renderProductsByCategory(category.file);
         categoryButtons.appendChild(button);
     });
