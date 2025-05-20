@@ -736,7 +736,7 @@ async function renderCategoryButtons() {
     categories.forEach(category => {
         const button = document.createElement('button');
         button.className = 'category-button';
-        button.textContent = category.name;
+        button.textContent = category.name.toLocaleLowerCase().replace("mens","men").replace("womens","women");
         button.onclick = () => renderProductsByCategory(category.file);
         categoryButtons.appendChild(button);
     });
